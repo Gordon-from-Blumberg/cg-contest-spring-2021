@@ -64,7 +64,7 @@ class Player {
                 }
             }
 
-            System.err.println(groupedActions);
+//            System.err.println(groupedActions);
 
             state.print();
 
@@ -120,20 +120,13 @@ class Player {
         }
 
         Cell neighbor(int cell, int dir) {
-            return cells[cells[cell].neighbors[dir]];
+            int neighborIndex = cells[cell].neighbors[dir];
+            return neighborIndex > -1 ? cells[neighborIndex] : null;
         }
 
         void print() {
-            System.err.println("score = " + myBot.score);
-            System.err.println("sun points = " + myBot.sun);
-            int[] treeCounts = new int[4];
-            for (Tree tree : myBot.trees) {
-                treeCounts[tree.size]++;
-            }
-            System.err.println("seeds = " + treeCounts[0]);
-            System.err.println("small trees = " + treeCounts[1]);
-            System.err.println("medium trees = " + treeCounts[2]);
-            System.err.println("large trees = " + treeCounts[3]);
+            myBot.print();
+            oppBot.print();
         }
 
         class Tree {
@@ -180,6 +173,48 @@ class Player {
             float getFinalScore() {
                 int sunScore = sun / 3;
                 return score + sunScore + 0.01f * trees.size();
+            }
+
+            int maxSun() {
+                int maxSun = sun, day = State.this.day;
+                while (++day <= LAST_DAY) {
+                    int sunDir = day % 6;
+                    int[] shadows = new int[cells.length];
+                    setShadows(shadows, myBot.trees, sunDir);
+                    setShadows(shadows, oppBot.trees, sunDir);
+
+                    for (Tree tree : trees) {
+                        if (tree.size > shadows[tree.cell.index])
+                            maxSun += tree.size;
+                    }
+                }
+                return maxSun;
+            }
+
+            void print() {
+                System.err.println("score = " + score);
+                System.err.println("sun points = " + sun);
+                int[] treeCounts = new int[4];
+                for (Tree tree : trees) {
+                    treeCounts[tree.size]++;
+                }
+                System.err.println("seeds = " + treeCounts[0]);
+                System.err.println("small trees = " + treeCounts[1]);
+                System.err.println("medium trees = " + treeCounts[2]);
+                System.err.println("large trees = " + treeCounts[3]);
+                System.err.println("theoretical max sun points = " + maxSun());
+            }
+
+            private void setShadows(int[] shadows, List<Tree> trees, int sunDir) {
+                for (Tree tree : trees) {
+                    int n = tree.size;
+                    Cell cell = tree.cell;
+                    while (n-- > 0 && cell != null) {
+                        cell = neighbor(cell.index, sunDir);
+                        if (cell != null && tree.size > shadows[cell.index])
+                            shadows[cell.index] = tree.size;
+                    }
+                }
             }
         }
     }
