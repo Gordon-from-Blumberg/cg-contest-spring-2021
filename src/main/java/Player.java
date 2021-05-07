@@ -9,11 +9,13 @@ import java.math.*;
  **/
 class Player {
     final int SEED_BASE_COST = 0;
-    final static int[] GROW_BASE_COST = new int[] {1, 3, 7};
-    final static int[] RICHNESS_BONUS = new int[] {0, 0, 2, 4};
-    final static int LAST_DAY = 23;
+    static final int[] GROW_BASE_COST = new int[] {1, 3, 7};
+    static final int[] RICHNESS_BONUS = new int[] {0, 0, 2, 4};
+    static final int LAST_DAY = 23;
 
-    public static void main(String args[]) {
+    final static Random rand = new Random(47);
+
+    public static void main(String[] args) {
         Scanner in = new Scanner(System.in);
         Cell[] cells = new Cell[in.nextInt()];
         for (int i = 0; i < cells.length; i++) {
@@ -64,35 +66,12 @@ class Player {
 
             System.err.println(groupedActions);
 
+            state.print();
+
             // Write an action using System.out.println()
             // To debug: System.err.println("Debug messages...");
 
-
-            // GROW cellIdx | SEED sourceIdx targetIdx | COMPLETE cellIdx | WAIT <message>
-
-            List<Integer> completeCells = groupedActions.get("COMPLETE");
-            List<Integer> growCells = groupedActions.get("GROW");
-//            if (completeCells != null) {
-//                Tree bestTree = null;
-//                for (int index : completeCells) {
-//                    Tree tree = trees[index];
-//                    if (bestTree == null || tree.cell.richness > bestTree.cell.richness)
-//                        bestTree = tree;
-//                }
-//                System.out.println("COMPLETE " + bestTree.cell.index);
-//            } else if (growCells != null) {
-//                Tree bestTree = null;
-//                for (int index : growCells) {
-//                    Tree tree = trees[index];
-//                    if (bestTree == null || tree.cell.richness > bestTree.cell.richness)
-//                        bestTree = tree;
-//                }
-//                System.out.println("GROW " + bestTree.cell.index);
-//            } else {
-//                System.out.println("WAIT");
-//            }
-
-            System.out.println("WAIT");
+            System.out.println(legalActions[rand.nextInt(legalActions.length)]);
         }
     }
 
@@ -142,6 +121,19 @@ class Player {
 
         Cell neighbor(int cell, int dir) {
             return cells[cells[cell].neighbors[dir]];
+        }
+
+        void print() {
+            System.err.println("score = " + myBot.score);
+            System.err.println("sun points = " + myBot.sun);
+            int[] treeCounts = new int[4];
+            for (Tree tree : myBot.trees) {
+                treeCounts[tree.size]++;
+            }
+            System.err.println("seeds = " + treeCounts[0]);
+            System.err.println("small trees = " + treeCounts[1]);
+            System.err.println("medium trees = " + treeCounts[2]);
+            System.err.println("large trees = " + treeCounts[3]);
         }
 
         class Tree {
