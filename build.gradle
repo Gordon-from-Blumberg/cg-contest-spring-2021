@@ -1,4 +1,7 @@
-plugins {
-    id 'java'
-}
+apply plugin: 'java'
+compileJava.options.encoding = 'Utf8'
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_8
+    targetCompatibility = JavaVersion.VERSION_8
+}
