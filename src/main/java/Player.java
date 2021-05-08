@@ -14,6 +14,8 @@ class Player {
     static final int[] RICHNESS_BONUS = new int[] { 0, 0, 2, 4 };
     static final int LAST_DAY = 23;
 
+    static final int SEED = 0, SMALL = 1, MEDIUM = 2, LARGE = 3;
+
     final static Random rand = new Random(47);
 
     public static void main(String[] args) {
@@ -24,6 +26,8 @@ class Player {
                     in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt());
         }
 
+        Cell.fillRings(cells);
+
         final State state = new State(cells);
 
         // game loop
@@ -33,13 +37,6 @@ class Player {
                     in.nextInt(), in.nextInt(),
                     in.nextInt() != 0
             );
-//            int day = in.nextInt(); // the game lasts 24 days: 0-23
-//            int nutrients = in.nextInt(); // the base score you gain from the next COMPLETE action
-//            int sun = in.nextInt(); // your sun points
-//            int score = in.nextInt(); // your current score
-//            int oppSun = in.nextInt(); // opponent's sun points
-//            int oppScore = in.nextInt(); // opponent's score
-//            boolean oppIsWaiting = in.nextInt() != 0; // whether your opponent is asleep until the next day
 
             int numberOfTrees = in.nextInt(); // the current amount of trees
             for (int i = 0; i < numberOfTrees; i++) {
@@ -67,9 +64,6 @@ class Player {
                 state.print();
             }
 
-            // Write an action using System.out.println()
-            // To debug: System.err.println("Debug messages...");
-
             System.out.println(legalActions[rand.nextInt(legalActions.length)]);
         }
     }
@@ -78,10 +72,61 @@ class Player {
         final int index, richness;
         final int[] neighbors = new int[6];
 
+        final Set<Cell> firstRing = new HashSet<>();
+        final Set<Cell> secondRing = new HashSet<>();
+        final Set<Cell> secondCircle = new HashSet<>();
+        final Set<Cell> thirdRing = new HashSet<>();
+        final Set<Cell> thirdCircle = new HashSet<>();
+
         Cell(int index, int richness, int... neighbors) {
             this.index = index;
             this.richness = richness;
             System.arraycopy(neighbors, 0, this.neighbors, 0, 6);
+        }
+
+        static void fillRings(Cell[] cells) {
+            for (Cell cell : cells) {
+                for (int neighborIndex : cell.neighbors) {
+                    if (neighborIndex > -1)
+                        cell.firstRing.add(cells[neighborIndex]);
+                }
+
+                for (Cell neighbor : cell.firstRing) {
+                    for (int neighborIndex : neighbor.neighbors) {
+                        if (neighborIndex > -1) {
+                            Cell neighbor2 = cells[neighborIndex];
+                            if (neighbor2 != cell && !cell.firstRing.contains(neighbor2))
+                                cell.secondRing.add(neighbor2);
+                        }
+                    }
+                }
+
+                cell.secondCircle.addAll(cell.firstRing);
+                cell.secondCircle.addAll(cell.secondRing);
+
+                for (Cell neighbor : cell.secondRing) {
+                    for (int neighborIndex : neighbor.neighbors) {
+                        if (neighborIndex > -1) {
+                            Cell neighbor3 = cells[neighborIndex];
+                            if (!cell.secondCircle.contains(neighbor3))
+                                cell.thirdRing.add(neighbor3);
+                        }
+                    }
+                }
+
+                cell.thirdCircle.addAll(cell.secondCircle);
+                cell.thirdCircle.addAll(cell.thirdRing);
+            }
+        }
+
+        static Cell neighbor(Cell[] cells, int cell, int dir) {
+            int neighborIndex = cells[cell].neighbors[dir];
+            return neighborIndex > -1 ? cells[neighborIndex] : null;
+        }
+
+        @Override
+        public String toString() {
+            return "cell#" + index;
         }
     }
 
@@ -163,8 +208,7 @@ class Player {
         }
 
         Cell neighbor(int cell, int dir) {
-            int neighborIndex = cells[cell].neighbors[dir];
-            return neighborIndex > -1 ? cells[neighborIndex] : null;
+            return Cell.neighbor(cells, cell, dir);
         }
 
         void print() {
@@ -253,6 +297,26 @@ class Player {
                 this.isWaiting = isWaiting;
             }
 
+            String act() {
+                int[] treeCounts = getTreeCounts();
+                for (Tree tree : trees) {
+                    if (tree.cell.richness == 3) {
+                        if (tree.size == LARGE) {
+                            if (sun >= 4)
+                                return "COMPLETE " + tree.cell.index;
+                            else
+                                return "WAIT";
+                        } else {
+                            if (sun >= tree.growCost())
+                                return "GROW " + tree.cell.index;
+                            else
+                                return "WAIT";
+                        }
+                    }
+                }
+                return "";
+            }
+
             void addTree(int cellIndex, int size, boolean isDormant) {
                 Tree tree = new Tree(cellIndex, size, isMine, isDormant);
                 trees.add(tree);
@@ -266,6 +330,14 @@ class Player {
                         count++;
                 }
                 return count;
+            }
+
+            int[] getTreeCounts() {
+                int[] counts = new int[4];
+                for (Tree tree : trees) {
+                    counts[tree.size]++;
+                }
+                return counts;
             }
 
             float getFinalScore() {
@@ -292,10 +364,7 @@ class Player {
             void print() {
                 System.err.println("score = " + score);
                 System.err.println("sun points = " + sun);
-                int[] treeCounts = new int[4];
-                for (Tree tree : trees) {
-                    treeCounts[tree.size]++;
-                }
+                int[] treeCounts = getTreeCounts();
                 System.err.println("seeds = " + treeCounts[0]);
                 System.err.println("small trees = " + treeCounts[1]);
                 System.err.println("medium trees = " + treeCounts[2]);
