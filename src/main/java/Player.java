@@ -56,15 +56,7 @@ class Player {
             System.err.println("Initial state -->");
             state.print();
 
-            state.save();
-            for (String action : legalActions) {
-                state.restore();
-                System.err.println("After action " + action + " -->");
-                state.applyAction(action);
-                state.print();
-            }
-
-            System.out.println(legalActions[rand.nextInt(legalActions.length)]);
+            System.out.println(state.myBot.act());
         }
     }
 
@@ -273,6 +265,27 @@ class Player {
             Tree copy() {
                 return new Tree(cell.index, size, isMine, isDormant);
             }
+
+            Cell richestCellToSeed() {
+                Cell richest = null;
+                Set<Cell> cellSet = size == 3 ? cell.thirdCircle
+                        : size == 2 ? cell.secondCircle
+                        : size == 1 ? cell.firstRing
+                        : Collections.emptySet();
+
+                for (Cell cell : cellSet) {
+                    if (cell.richness == 0 || treeMap.containsKey(cell.index))
+                        continue;
+
+                    if (richest == null || richest.richness < cell.richness) {
+                        richest = cell;
+                        if (richest.richness == 3)
+                            break;
+                    }
+                }
+
+                return richest;
+            }
         }
 
         class Bot {
@@ -298,23 +311,63 @@ class Player {
             }
 
             String act() {
-                int[] treeCounts = getTreeCounts();
-                for (Tree tree : trees) {
-                    if (tree.cell.richness == 3) {
-                        if (tree.size == LARGE) {
-                            if (sun >= 4)
-                                return "COMPLETE " + tree.cell.index;
-                            else
-                                return "WAIT";
+                int seedCount = getTreeCount(SEED);
+
+                // no seed -> we can seed free
+                if (seedCount == 0) {
+                    Tree toComplete = null;
+                    Tree toSeed = null;
+                    Cell seedTarget = null;
+                    for (Tree tree : trees) {
+                        if (tree.isDormant)
+                            continue;
+
+                        if (tree.size == LARGE && tree.cell.richness == 3 && toComplete == null) {
+                            toComplete = tree;
                         } else {
-                            if (sun >= tree.growCost())
-                                return "GROW " + tree.cell.index;
-                            else
-                                return "WAIT";
+                            Cell richestCellToSeed = tree.richestCellToSeed();
+                            if (seedTarget == null || richestCellToSeed != null && richestCellToSeed.richness > seedTarget.richness) {
+                                toSeed = tree;
+                                seedTarget = richestCellToSeed;
+                            }
                         }
                     }
+                    if (toSeed != null)
+                        return "SEED " + toSeed.cell.index + " " + seedTarget.index;
                 }
-                return "";
+
+                Tree toSeed = null, toGrow = null;
+                Cell seedTarget = null;
+                for (Tree tree : trees) {
+                    if (tree.isDormant)
+                        continue;
+
+                    if (tree.cell.richness == 3) {
+                        if (tree.size == LARGE) {
+                            return sun >= 4 ? "COMPLETE " + tree.cell.index : "WAIT";
+                        } else {
+                            return sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    } else {
+                        if (seedTarget == null) {
+                            Cell richestCellToSeed = tree.richestCellToSeed();
+                            if (richestCellToSeed != null && richestCellToSeed.richness == 3) {
+                                toSeed = tree;
+                                seedTarget = richestCellToSeed;
+                            }
+                        }
+                        if (toSeed != tree && (toGrow == null || toGrow.cell.richness < tree.cell.richness))
+                            toGrow = tree;
+                    }
+                }
+
+                if (toSeed != null) {
+                    return sun >= seedCount ? "SEED " + toSeed.cell.index + " " + seedTarget.index : "WAIT";
+                } else if (toGrow != null) {
+                    return sun >= toGrow.growCost() ? "GROW " + toGrow.cell.index : "WAIT";
+                }
+
+                return "WAIT";
             }
 
             void addTree(int cellIndex, int size, boolean isDormant) {
