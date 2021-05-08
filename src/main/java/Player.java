@@ -8,7 +8,7 @@ import java.math.*;
  * the standard input according to the problem statement.
  **/
 class Player {
-    final int SEED_BASE_COST = 0;
+    static final int SEED_BASE_COST = 0;
     static final int[] GROW_BASE_COST = new int[] {1, 3, 7};
     static final int[] RICHNESS_BONUS = new int[] {0, 0, 2, 4};
     static final int LAST_DAY = 23;
@@ -90,10 +90,15 @@ class Player {
         final Cell[] cells;
         int day, sunDir, nutrients;
 
-        final Bot myBot = new Bot(true);
-        final Bot oppBot = new Bot(false);
+        Bot myBot = new Bot(true);
+        Bot oppBot = new Bot(false);
 
         final Map<Integer, Tree> treeMap = new HashMap<>();
+
+        // backup
+        int dayB, sunDirB, nutrientsB;
+        Bot myBotB, oppBotB;
+        Map<Integer, Tree> treeMapB;
 
         State(Cell[] cells) {
             this.cells = cells;
@@ -113,6 +118,25 @@ class Player {
             oppBot.update(oppSun, oppScore, oppIsWaiting);
 
             treeMap.clear();
+        }
+
+        void save() {
+            dayB = day;
+            sunDirB = sunDir;
+            nutrientsB = nutrients;
+            treeMapB.clear();
+            myBotB = myBot.copy();
+            oppBotB = oppBot.copy();
+        }
+
+        void restore() {
+            day = dayB;
+            sunDir = sunDirB;
+            nutrients = nutrientsB;
+            treeMap.clear();
+            treeMap.putAll(treeMapB);
+            myBot = myBotB;
+            oppBot = oppBotB;
         }
 
         void addTree(int cellIndex, int size, boolean isMine, boolean isDormant) {
@@ -139,6 +163,37 @@ class Player {
                 this.size = size;
                 this.isMine = isMine;
                 this.isDormant = isDormant;
+            }
+
+            void complete() {
+                Bot owner = owner();
+                owner.score += nutrients + RICHNESS_BONUS[cell.richness];
+                nutrients--;
+                owner.trees.remove(this);
+                treeMap.remove(cell.index);
+            }
+
+            void grow() {
+                Bot owner = owner();
+                owner.sun -= growCost();
+                size++;
+                isDormant = true;
+            }
+
+            int growCost() {
+                return GROW_BASE_COST[size] + owner().getTreeCount(size + 1);
+            }
+
+            int seedCost() {
+                return SEED_BASE_COST + owner().getTreeCount(0);
+            }
+
+            Bot owner() {
+                return isMine ? myBot : oppBot;
+            }
+
+            Tree copy() {
+                return new Tree(cell.index, size, isMine, isDormant);
             }
         }
 
@@ -168,6 +223,15 @@ class Player {
                 Tree tree = new Tree(cellIndex, size, isMine, isDormant);
                 trees.add(tree);
                 treeMap.put(cellIndex, tree);
+            }
+
+            int getTreeCount(int size) {
+                int count = 0;
+                for (Tree tree : trees) {
+                    if (tree.size == size)
+                        count++;
+                }
+                return count;
             }
 
             float getFinalScore() {
@@ -203,6 +267,18 @@ class Player {
                 System.err.println("medium trees = " + treeCounts[2]);
                 System.err.println("large trees = " + treeCounts[3]);
                 System.err.println("theoretical max sun points = " + maxSun());
+            }
+
+            Bot copy() {
+                Bot clone = new Bot(isMine);
+                clone.update(sun, score, isWaiting);
+                List<Tree> cloneTrees = clone.trees;
+                for (Tree tree : trees) {
+                    Tree cloneTree = tree.copy();
+                    cloneTrees.add(cloneTree);
+                    treeMapB.put(cloneTree.cell.index, cloneTree);
+                }
+                return clone;
             }
 
             private void setShadows(int[] shadows, List<Tree> trees, int sunDir) {
