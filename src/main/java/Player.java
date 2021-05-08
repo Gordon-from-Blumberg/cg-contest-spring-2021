@@ -448,5 +448,23 @@ class Player {
                 }
             }
         }
+
+        enum Gene {
+            SEED_ON_RICHEST {
+                @Override
+                void apply() {
+
+                }
+            },
+
+            SEED_OUT_OF_SHADOWS {
+                @Override
+                void apply() {
+
+                }
+            };
+
+            abstract void apply();
+        }
     }
 }
