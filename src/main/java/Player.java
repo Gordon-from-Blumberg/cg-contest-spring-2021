@@ -9,8 +9,9 @@ import java.math.*;
  **/
 class Player {
     static final int SEED_BASE_COST = 0;
-    static final int[] GROW_BASE_COST = new int[] {1, 3, 7};
-    static final int[] RICHNESS_BONUS = new int[] {0, 0, 2, 4};
+    static final int[] GROW_BASE_COST = new int[] { 1, 3, 7 };
+    static final int COMPLETE_BASE_COST = 4;
+    static final int[] RICHNESS_BONUS = new int[] { 0, 0, 2, 4 };
     static final int LAST_DAY = 23;
 
     final static Random rand = new Random(47);
@@ -51,22 +52,20 @@ class Player {
                 in.nextLine();
             }
 
-            System.err.println(state.myBot.getFinalScore());
-            System.err.println(state.oppBot.getFinalScore());
-
-            Map<String, List<Integer>> groupedActions = new HashMap<>();
             for (int i = 0; i < legalActions.length; i++) {
                 legalActions[i] = in.nextLine(); // try printing something from here to start with
-                String[] actionParts = legalActions[i].split(" ");
-                if (!"WAIT".equals(actionParts[0])) {
-                    groupedActions.computeIfAbsent(actionParts[0], s -> new ArrayList<>())
-                            .add(Integer.parseInt(actionParts[1]));
-                }
             }
 
-//            System.err.println(groupedActions);
-
+            System.err.println("Initial state -->");
             state.print();
+
+            state.save();
+            for (String action : legalActions) {
+                state.restore();
+                System.err.println("After action " + action + " -->");
+                state.applyAction(action);
+                state.print();
+            }
 
             // Write an action using System.out.println()
             // To debug: System.err.println("Debug messages...");
@@ -93,12 +92,12 @@ class Player {
         Bot myBot = new Bot(true);
         Bot oppBot = new Bot(false);
 
-        final Map<Integer, Tree> treeMap = new HashMap<>();
+        final Map<Integer, Tree> treeMap = new HashMap<>(37);
 
         // backup
         int dayB, sunDirB, nutrientsB;
         Bot myBotB, oppBotB;
-        Map<Integer, Tree> treeMapB;
+        final Map<Integer, Tree> treeMapB = new HashMap<>(37);
 
         State(Cell[] cells) {
             this.cells = cells;
@@ -124,19 +123,39 @@ class Player {
             dayB = day;
             sunDirB = sunDir;
             nutrientsB = nutrients;
-            treeMapB.clear();
             myBotB = myBot.copy();
             oppBotB = oppBot.copy();
+            treeMapB.clear();
+            fillTreeMap(treeMapB, myBotB, oppBotB);
         }
 
         void restore() {
             day = dayB;
             sunDir = sunDirB;
             nutrients = nutrientsB;
+            myBot = myBotB.copy();
+            oppBot = oppBotB.copy();
             treeMap.clear();
-            treeMap.putAll(treeMapB);
-            myBot = myBotB;
-            oppBot = oppBotB;
+            fillTreeMap(treeMap, myBot, oppBot);
+        }
+
+        void applyAction(String action) {
+            String[] actParts = action.split(" ");
+            switch (actParts[0]) {
+                case "WAIT":
+                    myBot.isWaiting = true;
+                    break;
+                case "SEED":
+                    Tree tree = treeMap.get(Integer.parseInt(actParts[1]));
+                    tree.seed(Integer.parseInt(actParts[2]));
+                    break;
+                case "GROW":
+                    treeMap.get(Integer.parseInt(actParts[1])).grow();
+                    break;
+                case "COMPLETE":
+                    treeMap.get(Integer.parseInt(actParts[1])).complete();
+                    break;
+            }
         }
 
         void addTree(int cellIndex, int size, boolean isMine, boolean isDormant) {
@@ -150,7 +169,14 @@ class Player {
 
         void print() {
             myBot.print();
-            oppBot.print();
+//            oppBot.print();
+        }
+
+        private void fillTreeMap(Map<Integer, Tree> treeMap, Bot bot1, Bot bot2) {
+            for (Tree tree : bot1.trees)
+                treeMap.put(tree.cell.index, tree);
+            for (Tree tree : bot2.trees)
+                treeMap.put(tree.cell.index, tree);
         }
 
         class Tree {
@@ -168,6 +194,7 @@ class Player {
             void complete() {
                 Bot owner = owner();
                 owner.score += nutrients + RICHNESS_BONUS[cell.richness];
+                owner.sun -= COMPLETE_BASE_COST;
                 nutrients--;
                 owner.trees.remove(this);
                 treeMap.remove(cell.index);
@@ -177,6 +204,13 @@ class Player {
                 Bot owner = owner();
                 owner.sun -= growCost();
                 size++;
+                isDormant = true;
+            }
+
+            void seed(int targetCell) {
+                Bot owner = owner();
+                owner.sun -= seedCost();
+                owner.addTree(targetCell, 0, true);
                 isDormant = true;
             }
 
@@ -276,7 +310,6 @@ class Player {
                 for (Tree tree : trees) {
                     Tree cloneTree = tree.copy();
                     cloneTrees.add(cloneTree);
-                    treeMapB.put(cloneTree.cell.index, cloneTree);
                 }
                 return clone;
             }
