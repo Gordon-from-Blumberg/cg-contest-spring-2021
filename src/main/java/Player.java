@@ -208,6 +208,14 @@ class Player {
 //            oppBot.print();
         }
 
+        boolean isFreeRichestPresent() {
+            for (int i = 0; i < 7; i++) {
+                if (!treeMap.containsKey(i))
+                    return true;
+            }
+            return false;
+        }
+
         private void fillTreeMap(Map<Integer, Tree> treeMap, Bot bot1, Bot bot2) {
             for (Tree tree : bot1.trees)
                 treeMap.put(tree.cell.index, tree);
@@ -315,21 +323,16 @@ class Player {
 
                 // no seed -> we can seed free
                 if (seedCount == 0) {
-                    Tree toComplete = null;
                     Tree toSeed = null;
                     Cell seedTarget = null;
                     for (Tree tree : trees) {
                         if (tree.isDormant)
                             continue;
 
-                        if (tree.size == LARGE && tree.cell.richness == 3 && toComplete == null) {
-                            toComplete = tree;
-                        } else {
-                            Cell richestCellToSeed = tree.richestCellToSeed();
-                            if (seedTarget == null || richestCellToSeed != null && richestCellToSeed.richness > seedTarget.richness) {
-                                toSeed = tree;
-                                seedTarget = richestCellToSeed;
-                            }
+                        Cell richestCellToSeed = tree.richestCellToSeed();
+                        if (seedTarget == null || richestCellToSeed != null && richestCellToSeed.richness > seedTarget.richness) {
+                            toSeed = tree;
+                            seedTarget = richestCellToSeed;
                         }
                     }
                     if (toSeed != null)
