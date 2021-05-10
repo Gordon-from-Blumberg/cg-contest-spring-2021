@@ -1,7 +1,4 @@
 import java.util.*;
-import java.util.stream.Collectors;
-import java.io.*;
-import java.math.*;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -14,7 +11,8 @@ class Player {
     static final int[] RICHNESS_BONUS = new int[] { 0, 0, 2, 4 };
     static final int LAST_DAY = 23;
 
-    static final int SEED = 0, SMALL = 1, MEDIUM = 2, LARGE = 3;
+    static final int SEED = 0, SMALL_TREE = 1, MEDIUM_TREE = 2, LARGE_TREE = 3;
+    static final int UNUSABLE = 0, POOR_CELL = 1, MEDIUM_CELL = 2, RICH_CELL = 3;
 
     final static Random rand = new Random(47);
 
@@ -276,18 +274,18 @@ class Player {
 
             Cell richestCellToSeed() {
                 Cell richest = null;
-                Set<Cell> cellSet = size == 3 ? cell.thirdCircle
-                        : size == 2 ? cell.secondCircle
-                        : size == 1 ? cell.firstRing
+                Set<Cell> cellSet = size == LARGE_TREE ? cell.thirdCircle
+                        : size == MEDIUM_TREE ? cell.secondCircle
+                        : size == SMALL_TREE ? cell.firstRing
                         : Collections.emptySet();
 
                 for (Cell cell : cellSet) {
-                    if (cell.richness == 0 || treeMap.containsKey(cell.index))
+                    if (cell.richness == UNUSABLE || treeMap.containsKey(cell.index))
                         continue;
 
                     if (richest == null || richest.richness < cell.richness) {
                         richest = cell;
-                        if (richest.richness == 3)
+                        if (richest.richness == RICH_CELL)
                             break;
                     }
                 }
@@ -339,22 +337,33 @@ class Player {
                         return "SEED " + toSeed.cell.index + " " + seedTarget.index;
                 }
 
-                Tree toSeed = null, toGrow = null;
+                boolean isFreeRichestPresent = isFreeRichestPresent();
+                Tree toSeed = null, toGrow = null, toComplete = null;
                 Cell seedTarget = null;
                 for (Tree tree : trees) {
                     if (tree.isDormant)
                         continue;
 
-                    if (tree.cell.richness == 3) {
-                        if (tree.size == LARGE) {
-                            return sun >= 4 ? "COMPLETE " + tree.cell.index : "WAIT";
-                        } else {
-                            return sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                    if (tree.cell.richness == RICH_CELL) {
+                        if (tree.size == LARGE_TREE) {
+                            if (toComplete == null)
+                                toComplete = tree;
+                        } else if (toGrow == null) {
+                            toGrow = tree;
                         }
-                    } else {
-                        if (seedTarget == null) {
+
+                        if (isFreeRichestPresent) {
                             Cell richestCellToSeed = tree.richestCellToSeed();
-                            if (richestCellToSeed != null && richestCellToSeed.richness == 3) {
+                            if (richestCellToSeed != null && richestCellToSeed.richness == RICH_CELL) {
+                                toSeed = tree;
+                                seedTarget = richestCellToSeed;
+                            }
+                        }
+
+                    } else {
+                        if (seedTarget == null || toGrow == toSeed) {
+                            Cell richestCellToSeed = tree.richestCellToSeed();
+                            if (richestCellToSeed != null && richestCellToSeed.richness == RICH_CELL) {
                                 toSeed = tree;
                                 seedTarget = richestCellToSeed;
                             }
@@ -363,6 +372,12 @@ class Player {
                             toGrow = tree;
                     }
                 }
+
+                if (!isFreeRichestPresent && toComplete != null)
+                    return sun >= COMPLETE_BASE_COST ? "COMPLETE " + toComplete.cell.index : "WAIT";
+
+                if (day == LAST_DAY && toComplete != null && sun >= COMPLETE_BASE_COST)
+                    return "COMPLETE " + toComplete.cell.index;
 
                 if (toSeed != null) {
                     return sun >= seedCount ? "SEED " + toSeed.cell.index + " " + seedTarget.index : "WAIT";
@@ -421,10 +436,10 @@ class Player {
                 System.err.println("score = " + score);
                 System.err.println("sun points = " + sun);
                 int[] treeCounts = getTreeCounts();
-                System.err.println("seeds = " + treeCounts[0]);
-                System.err.println("small trees = " + treeCounts[1]);
-                System.err.println("medium trees = " + treeCounts[2]);
-                System.err.println("large trees = " + treeCounts[3]);
+                System.err.println("seeds = " + treeCounts[SEED]);
+                System.err.println("small trees = " + treeCounts[SMALL_TREE]);
+                System.err.println("medium trees = " + treeCounts[MEDIUM_TREE]);
+                System.err.println("large trees = " + treeCounts[LARGE_TREE]);
                 System.err.println("theoretical max sun points = " + maxSun());
             }
 
