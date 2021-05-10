@@ -129,11 +129,6 @@ class Player {
 
         final Map<Integer, Tree> treeMap = new HashMap<>(37);
 
-        // backup
-        int dayB, sunDirB, nutrientsB;
-        Bot myBotB, oppBotB;
-        final Map<Integer, Tree> treeMapB = new HashMap<>(37);
-
         State(Cell[] cells) {
             this.cells = cells;
         }
@@ -154,24 +149,15 @@ class Player {
             treeMap.clear();
         }
 
-        void save() {
-            dayB = day;
-            sunDirB = sunDir;
-            nutrientsB = nutrients;
-            myBotB = myBot.copy();
-            oppBotB = oppBot.copy();
-            treeMapB.clear();
-            fillTreeMap(treeMapB, myBotB, oppBotB);
+        State copy() {
+            State clone = new State(cells);
+            copyTo(clone);
+            return clone;
         }
 
-        void restore() {
-            day = dayB;
-            sunDir = sunDirB;
-            nutrients = nutrientsB;
-            myBot = myBotB.copy();
-            oppBot = oppBotB.copy();
-            treeMap.clear();
-            fillTreeMap(treeMap, myBot, oppBot);
+        void copyTo(State clone) {
+            clone.update(day, nutrients, myBot.sun, myBot.score, oppBot.sun, oppBot.score, oppBot.isWaiting);
+            treeMap.values().forEach(tree -> clone.addTree(tree.cell.index, tree.size, tree.isMine, tree.isDormant));
         }
 
         void applyAction(String action) {
@@ -274,12 +260,7 @@ class Player {
 
             Cell richestCellToSeed() {
                 Cell richest = null;
-                Set<Cell> cellSet = size == LARGE_TREE ? cell.thirdCircle
-                        : size == MEDIUM_TREE ? cell.secondCircle
-                        : size == SMALL_TREE ? cell.firstRing
-                        : Collections.emptySet();
-
-                for (Cell cell : cellSet) {
+                for (Cell cell : seedCells()) {
                     if (cell.richness == UNUSABLE || treeMap.containsKey(cell.index))
                         continue;
 
@@ -291,6 +272,13 @@ class Player {
                 }
 
                 return richest;
+            }
+
+            Set<Cell> seedCells() {
+                return size == LARGE_TREE ? cell.thirdCircle
+                        : size == MEDIUM_TREE ? cell.secondCircle
+                        : size == SMALL_TREE ? cell.firstRing
+                        : Collections.emptySet();
             }
         }
 
@@ -461,21 +449,125 @@ class Player {
         }
 
         enum Gene {
-            SEED_ON_RICHEST {
+            WAIT {
                 @Override
-                void apply() {
+                String act(State state) {
+                    return "WAIT";
+                }
+            },
+
+            SEED {
+                @Override
+                String act(State state) {
+                    final Map<Integer, Tree> treeMap = state.treeMap;
+                    for (final Tree tree : state.myBot.trees) {
+                        if (tree.isDormant)
+                            continue;
+
+                        for (final Cell cellToSeed : tree.seedCells()) {
+                            if (!treeMap.containsKey(cellToSeed.index)) {
+                                return state.myBot.sun >= tree.seedCost()
+                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+                                        : "WAIT";
+                            }
+                        }
+                    }
+                    return "WAIT";
+                }
+            },
+
+            SEED_ON_RICH {
+                @Override
+                String act(State state) {
 
                 }
             },
 
             SEED_OUT_OF_SHADOWS {
                 @Override
-                void apply() {
+                String act(State state) {
 
+                }
+            },
+
+            SEED_TO_SHADOW_OPP {
+                @Override
+                String act(State state) {
+
+                }
+            },
+
+            GROW {
+                @Override
+                String act(State state) {
+
+                }
+            },
+
+            GROW_ON_RICH {
+                @Override
+                String act(State state) {
+
+                }
+            },
+
+            GROW_OUT_OF_SHADOWS {
+                @Override
+                String act(State state) {
+
+                }
+            },
+
+            GROW_TO_SHADOW_OPP {
+                @Override
+                String act(State state) {
+
+                }
+            },
+
+            GROW_ON_MEDIUM {
+                @Override
+                String act(State state) {
+                    return " ";
+                }
+            },
+
+            GROW_ON_POOR {
+                @Override
+                String act(State state) {
+                    return " ";
+                }
+            },
+
+            COMPLETE {
+                @Override
+                String act(State state) {
+                    return " ";
+                }
+            },
+
+            COMPLETE_RICH {
+                @Override
+                String act(State state) {
+                    return " ";
+                }
+            },
+
+            COMPLETE_MEDIUM {
+                @Override
+                String act(State state) {
+                    return " ";
+                }
+            },
+
+            COMPLETE_POOR {
+                @Override
+                String act(State state) {
+                    return " ";
                 }
             };
 
-            abstract void apply();
+            abstract String act(State state);
         }
     }
 }
