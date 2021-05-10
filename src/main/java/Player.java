@@ -17,7 +17,7 @@ class Player {
     static final int FIRST_TURN = 1000 - 50;
     static final int REST_TURNS = 100 - 15;
 
-    static final int GENES_COUNT = 30;
+    static final int GENES_COUNT = 100;
     static final int POPULATION = 20;
     static final int MATING_POOL_SIZE = 150;
     static final float MUTATION_CHANCE = 0.05f;
@@ -66,11 +66,11 @@ class Player {
 
             final State.DNA[] matingPool = new State.DNA[MATING_POOL_SIZE];
 
-//            int generationNumber = 0;
+            int generationNumber = 0;
             int realMatingPoolSize = 0;
             State.DNA bestSolution = null;
             while (System.currentTimeMillis() < endTime) {
-//                generationNumber++;
+                generationNumber++;
                 if (matingPool[0] == null) {
                     population[0] = population[0] != null ? population[0].toNextTurn() : State.DNA.random();
                     for (int i = 1; i < POPULATION; i++)
@@ -106,11 +106,13 @@ class Player {
                 }
             }
 
-            assert bestSolution != null;
+//            assert bestSolution != null;
 //            System.err.println("generation #" + generationNumber);
 //            System.err.println("best score = " + bestSolution.score);
 //            System.err.println("best solution = " + bestSolution);
+
             System.out.println(bestSolution.firstAction);
+//            System.out.println(state.myBot.act());
 
             allowedDelay = REST_TURNS;
         }
@@ -431,7 +433,10 @@ class Player {
                     }
                 }
 
-                if (!isFreeRichestPresent && toComplete != null && treeCounts[LARGE_TREE] > 1 && treeCounts[MEDIUM_TREE] > 1) {
+                if ((!isFreeRichestPresent || nutrients > 18)
+                        && toComplete != null
+                        && treeCounts[LARGE_TREE] > 1
+                        && treeCounts[MEDIUM_TREE] > 1) {
 //                    System.err.println("No free richest cell and can complete -> complete");
                     return sun >= COMPLETE_BASE_COST ? "COMPLETE " + toComplete.cell.index : "WAIT";
                 }
@@ -568,8 +573,13 @@ class Player {
 
             static void fitness(State state, DNA solution) {
                 int score = state.myBot.getFinalScore();
-                if (state.gameOver && score > state.oppBot.getFinalScore())
-                    score *= 2;
+                if (state.gameOver) {
+                    final int oppScore = state.oppBot.getFinalScore();
+                    if (score > oppScore)
+                        score *= 2;
+                    else if (score < oppScore)
+                        score /= 2;
+                }
 
                 solution.score = score;
             }
