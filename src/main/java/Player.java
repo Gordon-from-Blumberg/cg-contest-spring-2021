@@ -554,7 +554,7 @@ class Player {
                 @Override
                 String act(State state) {
                     for (Tree tree : state.myBot.trees) {
-                        if (tree.size < LARGE_TREE) {
+                        if (!tree.isDormant && tree.size < LARGE_TREE) {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
@@ -566,7 +566,7 @@ class Player {
                 @Override
                 String act(State state) {
                     for (Tree tree : state.myBot.trees) {
-                        if (tree.size < LARGE_TREE && tree.cell.richness == RICH_CELL) {
+                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == RICH_CELL) {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
@@ -578,7 +578,7 @@ class Player {
                 @Override
                 String act(State state) {
                     for (Tree tree : state.myBot.trees) {
-                        if (tree.size < LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
+                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
@@ -590,7 +590,7 @@ class Player {
                 @Override
                 String act(State state) {
                     for (Tree tree : state.myBot.trees) {
-                        if (tree.size < LARGE_TREE && tree.cell.richness == POOR_CELL) {
+                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == POOR_CELL) {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
@@ -602,7 +602,7 @@ class Player {
                 @Override
                 String act(State state) {
                     for (Tree tree : state.myBot.trees) {
-                        if (tree.size == Player.SEED) {
+                        if (!tree.isDormant && tree.size == Player.SEED) {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
@@ -614,7 +614,7 @@ class Player {
                 @Override
                 String act(State state) {
                     for (Tree tree : state.myBot.trees) {
-                        if (tree.size == SMALL_TREE) {
+                        if (!tree.isDormant && tree.size == SMALL_TREE) {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
@@ -626,7 +626,7 @@ class Player {
                 @Override
                 String act(State state) {
                     for (Tree tree : state.myBot.trees) {
-                        if (tree.size == MEDIUM_TREE) {
+                        if (!tree.isDormant && tree.size == MEDIUM_TREE) {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
