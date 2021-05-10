@@ -652,6 +652,11 @@ class Player {
             COMPLETE {
                 @Override
                 String act(State state) {
+                    for (Tree tree : state.myBot.trees) {
+                        if (!tree.isDormant && tree.size == LARGE_TREE) {
+                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+                        }
+                    }
                     return "WAIT";
                 }
             },
@@ -659,6 +664,11 @@ class Player {
             COMPLETE_RICH {
                 @Override
                 String act(State state) {
+                    for (Tree tree : state.myBot.trees) {
+                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == RICH_CELL) {
+                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+                        }
+                    }
                     return "WAIT";
                 }
             },
@@ -666,6 +676,11 @@ class Player {
             COMPLETE_MEDIUM {
                 @Override
                 String act(State state) {
+                    for (Tree tree : state.myBot.trees) {
+                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
+                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+                        }
+                    }
                     return "WAIT";
                 }
             },
@@ -673,6 +688,11 @@ class Player {
             COMPLETE_POOR {
                 @Override
                 String act(State state) {
+                    for (Tree tree : state.myBot.trees) {
+                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == POOR_CELL) {
+                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+                        }
+                    }
                     return "WAIT";
                 }
             };
