@@ -14,8 +14,8 @@ class Player {
     static final int SEED = 0, SMALL_TREE = 1, MEDIUM_TREE = 2, LARGE_TREE = 3;
     static final int UNUSABLE = 0, POOR_CELL = 1, MEDIUM_CELL = 2, RICH_CELL = 3;
 
-    static final int FIRST_TURN = 1000 - 5;
-    static final int REST_TURNS = 100 - 5;
+    static final int FIRST_TURN = 1000 - 50;
+    static final int REST_TURNS = 100 - 15;
 
     static final int GENES_COUNT = 30;
     static final int POPULATION = 20;
@@ -36,6 +36,7 @@ class Player {
 
         int allowedDelay = FIRST_TURN;
         final State state = new State(cells);
+        final State.DNA[] population = new State.DNA[POPULATION];
 
         // game loop
         while (true) {
@@ -62,11 +63,14 @@ class Player {
             }
 
             final long endTime = System.currentTimeMillis() + allowedDelay;
-            final State.DNA[] population = new State.DNA[POPULATION];
+
             final State.DNA[] matingPool = new State.DNA[MATING_POOL_SIZE];
 
+//            int generationNumber = 0;
             int realMatingPoolSize = 0;
+            State.DNA bestSolution = null;
             while (System.currentTimeMillis() < endTime) {
+//                generationNumber++;
                 if (matingPool[0] == null) {
                     population[0] = population[0] != null ? population[0].toNextTurn() : State.DNA.random();
                     for (int i = 1; i < POPULATION; i++)
@@ -86,7 +90,6 @@ class Player {
                 }
 
                 int totalFitness = 0;
-                State.DNA bestSolution = null;
                 for (int i = 0; i < POPULATION; i++) {
                     final int score = population[i].score;
                     totalFitness += score;
@@ -101,13 +104,13 @@ class Player {
                     for (int j = 0; j < n; j++)
                         matingPool[realMatingPoolSize++] = solution;
                 }
-
-                System.err.println("real mating pool size = " + realMatingPoolSize);
-                System.err.println("best score = " + bestSolution.score);
-                System.err.println("best solution = " + bestSolution);
             }
 
-            System.out.println(state.myBot.act());
+            assert bestSolution != null;
+//            System.err.println("generation #" + generationNumber);
+//            System.err.println("best score = " + bestSolution.score);
+//            System.err.println("best solution = " + bestSolution);
+            System.out.println(bestSolution.firstAction);
 
             allowedDelay = REST_TURNS;
         }
@@ -184,6 +187,7 @@ class Player {
 
         final Map<Integer, Tree> treeMap = new HashMap<>(37);
         int[] shadows;
+        boolean gameOver;
 
         State(Cell[] cells) {
             this.cells = cells;
@@ -216,6 +220,7 @@ class Player {
             treeMap.values().forEach(tree -> clone.addTree(tree.cell.index, tree.size, tree.isMine, tree.isDormant));
             clone.shadows = new int[cells.length];
             System.arraycopy(shadows, 0, clone.shadows, 0, shadows.length);
+            clone.gameOver = gameOver;
         }
 
         void applyAction(String[] actionPats, Tree tree, Bot bot) {
@@ -519,7 +524,7 @@ class Player {
                 final Bot myBot = state.myBot;
                 final Bot oppBot = state.oppBot;
                 int geneIndex = 0;
-                while (state.day < LAST_DAY && geneIndex < GENES_COUNT) {
+                while (state.day <= LAST_DAY && geneIndex < GENES_COUNT) {
                     final Gene gene = solution.genes[geneIndex];
                     final String myAction = myBot.isWaiting ? "WAIT" : gene.act(state);
                     if (solution.firstAction == null)
@@ -552,12 +557,19 @@ class Player {
 
                     // switch to new day
                     if (myBot.isWaiting && oppBot.isWaiting)
-                        state.nextDay();
+                        if (state.day == LAST_DAY) {
+                            state.gameOver = true;
+                            break;
+                        } else {
+                            state.nextDay();
+                        }
                 }
             }
 
             static void fitness(State state, DNA solution) {
                 int score = state.myBot.getFinalScore();
+                if (state.gameOver && score > state.oppBot.getFinalScore())
+                    score *= 2;
 
                 solution.score = score;
             }
