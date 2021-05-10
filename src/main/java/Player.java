@@ -499,14 +499,14 @@ class Player {
             SEED_OUT_OF_SHADOWS {
                 @Override
                 String act(State state) {
-
+                    return "WAIT";
                 }
             },
 
             SEED_TO_SHADOW_OPP {
                 @Override
                 String act(State state) {
-
+                    return "WAIT";
                 }
             },
 
@@ -553,14 +553,24 @@ class Player {
             GROW {
                 @Override
                 String act(State state) {
-
+                    for (Tree tree : state.myBot.trees) {
+                        if (tree.size < LARGE_TREE) {
+                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    }
+                    return "WAIT";
                 }
             },
 
             GROW_ON_RICH {
                 @Override
                 String act(State state) {
-
+                    for (Tree tree : state.myBot.trees) {
+                        if (tree.size < LARGE_TREE && tree.cell.richness == RICH_CELL) {
+                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    }
+                    return "WAIT";
                 }
             },
 
@@ -568,55 +578,66 @@ class Player {
                 @Override
                 String act(State state) {
 
+                    return "WAIT";
                 }
             },
 
             GROW_TO_SHADOW_OPP {
                 @Override
                 String act(State state) {
-
+                    return "WAIT";
                 }
             },
 
             GROW_ON_MEDIUM {
                 @Override
                 String act(State state) {
-                    return " ";
+                    for (Tree tree : state.myBot.trees) {
+                        if (tree.size < LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
+                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    }
+                    return "WAIT";
                 }
             },
 
             GROW_ON_POOR {
                 @Override
                 String act(State state) {
-                    return " ";
+                    for (Tree tree : state.myBot.trees) {
+                        if (tree.size < LARGE_TREE && tree.cell.richness == POOR_CELL) {
+                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    }
+                    return "WAIT";
                 }
             },
 
             COMPLETE {
                 @Override
                 String act(State state) {
-                    return " ";
+                    return "WAIT";
                 }
             },
 
             COMPLETE_RICH {
                 @Override
                 String act(State state) {
-                    return " ";
+                    return "WAIT";
                 }
             },
 
             COMPLETE_MEDIUM {
                 @Override
                 String act(State state) {
-                    return " ";
+                    return "WAIT";
                 }
             },
 
             COMPLETE_POOR {
                 @Override
                 String act(State state) {
-                    return " ";
+                    return "WAIT";
                 }
             };
 
