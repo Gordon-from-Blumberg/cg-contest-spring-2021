@@ -14,8 +14,12 @@ class Player {
     static final int SEED = 0, SMALL_TREE = 1, MEDIUM_TREE = 2, LARGE_TREE = 3;
     static final int UNUSABLE = 0, POOR_CELL = 1, MEDIUM_CELL = 2, RICH_CELL = 3;
 
+    static final int FIRST_TURN = 1000 - 5;
+    static final int REST_TURNS = 100 - 5;
+
     static final int GENES_COUNT = 30;
     static final int POPULATION = 20;
+    static final int MATING_POOL_SIZE = 150;
     static final float MUTATION_CHANCE = 0.05f;
 
     static final Random RAND = new Random(47);
@@ -30,6 +34,7 @@ class Player {
 
         Cell.fillRings(cells);
 
+        int allowedDelay = FIRST_TURN;
         final State state = new State(cells);
 
         // game loop
@@ -56,10 +61,55 @@ class Player {
                 legalActions[i] = in.nextLine(); // try printing something from here to start with
             }
 
-            System.err.println("Initial state -->");
-            state.print();
+            final long endTime = System.currentTimeMillis() + allowedDelay;
+            final State.DNA[] population = new State.DNA[POPULATION];
+            final State.DNA[] matingPool = new State.DNA[MATING_POOL_SIZE];
+
+            int realMatingPoolSize = 0;
+            while (System.currentTimeMillis() < endTime) {
+                if (matingPool[0] == null) {
+                    population[0] = population[0] != null ? population[0].toNextTurn() : State.DNA.random();
+                    for (int i = 1; i < POPULATION; i++)
+                        population[i] = State.DNA.random();
+                } else {
+                    for (int i = 0; i < POPULATION; i++)
+                        population[i] = State.DNA.crossover(
+                                matingPool[RAND.nextInt(realMatingPoolSize)],
+                                matingPool[RAND.nextInt(realMatingPoolSize)]
+                        );
+                }
+
+                for (int i = 0; i < POPULATION; i++) {
+                    final State copy = state.copy();
+                    State.Genetic.simulate(copy, population[i]);
+                    State.Genetic.fitness(copy, population[i]);
+                }
+
+                int totalFitness = 0;
+                State.DNA bestSolution = null;
+                for (int i = 0; i < POPULATION; i++) {
+                    final int score = population[i].score;
+                    totalFitness += score;
+                    if (bestSolution == null || score > bestSolution.score)
+                        bestSolution = population[i];
+                }
+
+                realMatingPoolSize = 0;
+                for (int i = 0; i < POPULATION; i++) {
+                    final State.DNA solution = population[i];
+                    final int n = solution.score * MATING_POOL_SIZE / totalFitness;
+                    for (int j = 0; j < n; j++)
+                        matingPool[realMatingPoolSize++] = solution;
+                }
+
+                System.err.println("real mating pool size = " + realMatingPoolSize);
+                System.err.println("best score = " + bestSolution.score);
+                System.err.println("best solution = " + bestSolution);
+            }
 
             System.out.println(state.myBot.act());
+
+            allowedDelay = REST_TURNS;
         }
     }
 
@@ -337,7 +387,6 @@ class Player {
                 int[] treeCounts = getTreeCounts();
 
                 boolean isFreeRichestPresent = isFreeRichestPresent();
-                System.err.println("isFreeRichestPresent = " + isFreeRichestPresent);
                 Tree toSeed = null, toGrow = null, toComplete = null;
                 Cell seedTarget = null;
                 for (Tree tree : trees) {
@@ -346,7 +395,6 @@ class Player {
 
                     if (tree.cell.richness == RICH_CELL) {
                         if (tree.size == LARGE_TREE) {
-                            System.err.println("Tree on rich cell#" + tree.cell.index + " is large");
                             if (toComplete == null) {
                                 toComplete = tree;
                             }
@@ -379,12 +427,12 @@ class Player {
                 }
 
                 if (!isFreeRichestPresent && toComplete != null && treeCounts[LARGE_TREE] > 1 && treeCounts[MEDIUM_TREE] > 1) {
-                    System.err.println("No free richest cell and can complete -> complete");
+//                    System.err.println("No free richest cell and can complete -> complete");
                     return sun >= COMPLETE_BASE_COST ? "COMPLETE " + toComplete.cell.index : "WAIT";
                 }
 
                 if (day == LAST_DAY && toComplete != null && sun >= COMPLETE_BASE_COST) {
-                    System.err.println("Last day and can complete -> complete");
+//                    System.err.println("Last day and can complete -> complete");
                     return "COMPLETE " + toComplete.cell.index;
                 }
 
@@ -421,9 +469,9 @@ class Player {
                 return counts;
             }
 
-            float getFinalScore() {
+            int getFinalScore() {
                 int sunScore = sun / 3;
-                return score + sunScore + 0.01f * trees.size();
+                return 100 * (score + sunScore) + trees.size();
             }
 
             int maxSun() {
@@ -474,6 +522,8 @@ class Player {
                 while (state.day < LAST_DAY && geneIndex < GENES_COUNT) {
                     final Gene gene = solution.genes[geneIndex];
                     final String myAction = myBot.isWaiting ? "WAIT" : gene.act(state);
+                    if (solution.firstAction == null)
+                        solution.firstAction = myAction;
                     final String oppAction = oppBot.isWaiting ? "WAIT" : oppBot.act();
 
                     final String[] myActionParts = myAction.split(" ");
@@ -507,7 +557,7 @@ class Player {
             }
 
             static void fitness(State state, DNA solution) {
-                int score = 0;
+                int score = state.myBot.getFinalScore();
 
                 solution.score = score;
             }
@@ -517,6 +567,7 @@ class Player {
             final Gene[] genes = new Gene[GENES_COUNT];
 
             int score;
+            String firstAction;
 
             static DNA random() {
                final DNA dna = new DNA();
@@ -533,6 +584,22 @@ class Player {
                             : (RAND.nextFloat() < 0.5 ? parent1 : parent2).genes[i];
                 }
                 return child;
+            }
+
+            DNA toNextTurn() {
+                score = 0;
+                firstAction = null;
+                final int n = GENES_COUNT - 1;
+                for (int i = 0; i < n; i++) {
+                    genes[i] = genes[i + 1];
+                }
+                genes[n] = Gene.random();
+                return this;
+            }
+
+            @Override
+            public String toString() {
+                return Arrays.toString(genes);
             }
         }
 
