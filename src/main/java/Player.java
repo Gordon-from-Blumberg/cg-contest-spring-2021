@@ -14,7 +14,11 @@ class Player {
     static final int SEED = 0, SMALL_TREE = 1, MEDIUM_TREE = 2, LARGE_TREE = 3;
     static final int UNUSABLE = 0, POOR_CELL = 1, MEDIUM_CELL = 2, RICH_CELL = 3;
 
-    final static Random rand = new Random(47);
+    static final int GENES_COUNT = 30;
+    static final int POPULATION = 20;
+    static final float MUTATION_CHANCE = 0.05f;
+
+    static final Random RAND = new Random(47);
 
     public static void main(String[] args) {
         Scanner in = new Scanner(System.in);
@@ -40,6 +44,7 @@ class Player {
             for (int i = 0; i < numberOfTrees; i++) {
                 state.addTree(in.nextInt(), in.nextInt(), in.nextInt() != 0, in.nextInt() != 0);
             }
+            state.setShadows(new int[cells.length]);
 
             String[] legalActions = new String[in.nextInt()];
 
@@ -128,6 +133,7 @@ class Player {
         Bot oppBot = new Bot(false);
 
         final Map<Integer, Tree> treeMap = new HashMap<>(37);
+        int[] shadows;
 
         State(Cell[] cells) {
             this.cells = cells;
@@ -158,38 +164,63 @@ class Player {
         void copyTo(State clone) {
             clone.update(day, nutrients, myBot.sun, myBot.score, oppBot.sun, oppBot.score, oppBot.isWaiting);
             treeMap.values().forEach(tree -> clone.addTree(tree.cell.index, tree.size, tree.isMine, tree.isDormant));
+            clone.shadows = new int[cells.length];
+            System.arraycopy(shadows, 0, clone.shadows, 0, shadows.length);
         }
 
-        void applyAction(String action) {
-            String[] actParts = action.split(" ");
-            switch (actParts[0]) {
+        void applyAction(String[] actionPats, Tree tree, Bot bot) {
+            switch (actionPats[0]) {
                 case "WAIT":
-                    myBot.isWaiting = true;
+                    bot.isWaiting = true;
                     break;
                 case "SEED":
-                    Tree tree = treeMap.get(Integer.parseInt(actParts[1]));
-                    tree.seed(Integer.parseInt(actParts[2]));
+                    tree.seed(Integer.parseInt(actionPats[2]));
                     break;
                 case "GROW":
-                    treeMap.get(Integer.parseInt(actParts[1])).grow();
+                    tree.grow();
                     break;
                 case "COMPLETE":
-                    treeMap.get(Integer.parseInt(actParts[1])).complete();
+                    tree.complete();
                     break;
             }
+        }
+
+        void nextDay() {
+            sunDir = ++day % 6;
+            setShadows(new int[cells.length]);
+            myBot.isWaiting = false;
+            myBot.trees.forEach(tree -> {
+                tree.isDormant = false;
+                if (tree.size > shadows[tree.cell.index])
+                    myBot.sun += tree.size;
+            });
+            oppBot.isWaiting = false;
+            oppBot.trees.forEach(tree -> {
+                tree.isDormant = false;
+                if (tree.size > shadows[tree.cell.index])
+                    oppBot.sun += tree.size;
+            });
         }
 
         void addTree(int cellIndex, int size, boolean isMine, boolean isDormant) {
             (isMine ? myBot : oppBot).addTree(cellIndex, size, isDormant);
         }
 
-        Cell neighbor(int cell, int dir) {
-            return Cell.neighbor(cells, cell, dir);
+        void setShadows(int[] shadows) {
+            for (Tree tree : treeMap.values()) {
+                int n = tree.size;
+                Cell cell = tree.cell;
+                while (n-- > 0 && cell != null) {
+                    cell = neighbor(cell.index, sunDir);
+                    if (cell != null && tree.size > shadows[cell.index])
+                        shadows[cell.index] = tree.size;
+                }
+            }
+            this.shadows = shadows;
         }
 
-        void print() {
-            myBot.print();
-//            oppBot.print();
+        Cell neighbor(int cell, int dir) {
+            return Cell.neighbor(cells, cell, dir);
         }
 
         boolean isFreeRichestPresent() {
@@ -200,11 +231,9 @@ class Player {
             return false;
         }
 
-        private void fillTreeMap(Map<Integer, Tree> treeMap, Bot bot1, Bot bot2) {
-            for (Tree tree : bot1.trees)
-                treeMap.put(tree.cell.index, tree);
-            for (Tree tree : bot2.trees)
-                treeMap.put(tree.cell.index, tree);
+        void print() {
+            myBot.print();
+//            oppBot.print();
         }
 
         class Tree {
@@ -402,8 +431,8 @@ class Player {
                 while (++day <= LAST_DAY) {
                     int sunDir = day % 6;
                     int[] shadows = new int[cells.length];
-                    setShadows(shadows, myBot.trees, sunDir);
-                    setShadows(shadows, oppBot.trees, sunDir);
+//                    setShadows(shadows, myBot.trees, sunDir);
+//                    setShadows(shadows, oppBot.trees, sunDir);
 
                     for (Tree tree : trees) {
                         if (tree.size > shadows[tree.cell.index])
@@ -421,7 +450,7 @@ class Player {
                 System.err.println("small trees = " + treeCounts[SMALL_TREE]);
                 System.err.println("medium trees = " + treeCounts[MEDIUM_TREE]);
                 System.err.println("large trees = " + treeCounts[LARGE_TREE]);
-                System.err.println("theoretical max sun points = " + maxSun());
+//                System.err.println("theoretical max sun points = " + maxSun());
             }
 
             Bot copy() {
@@ -434,17 +463,76 @@ class Player {
                 }
                 return clone;
             }
+        }
 
-            private void setShadows(int[] shadows, List<Tree> trees, int sunDir) {
-                for (Tree tree : trees) {
-                    int n = tree.size;
-                    Cell cell = tree.cell;
-                    while (n-- > 0 && cell != null) {
-                        cell = neighbor(cell.index, sunDir);
-                        if (cell != null && tree.size > shadows[cell.index])
-                            shadows[cell.index] = tree.size;
+        static class Genetic {
+            static void simulate(State state, DNA solution) {
+                final Map<Integer, Tree> treeMap = state.treeMap;
+                final Bot myBot = state.myBot;
+                final Bot oppBot = state.oppBot;
+                int geneIndex = 0;
+                while (state.day < LAST_DAY && geneIndex < GENES_COUNT) {
+                    final Gene gene = solution.genes[geneIndex];
+                    final String myAction = myBot.isWaiting ? "WAIT" : gene.act(state);
+                    final String oppAction = oppBot.isWaiting ? "WAIT" : oppBot.act();
+
+                    final String[] myActionParts = myAction.split(" ");
+                    final String[] oppActionParts = oppAction.split(" ");
+
+                    final Tree myActingTree = myActionParts.length > 1 ? treeMap.get(Integer.parseInt(myActionParts[1])) : null;
+                    final Tree oppActingTree = oppActionParts.length > 1 ? treeMap.get(Integer.parseInt(oppActionParts[1])) : null;
+
+                    if (myAction.startsWith("SEED")
+                            && oppAction.startsWith("SEED")
+                            && myActionParts[2].equals(oppActionParts[2])) {
+                        myActingTree.isDormant = true;
+                        oppActingTree.isDormant = true;
+                        myBot.sun -= myActingTree.seedCost();
+                        oppBot.sun -= oppActingTree.seedCost();
+                    } else {
+                        state.applyAction(myActionParts, myActingTree, myBot);
+                        state.applyAction(oppActionParts, oppActingTree, oppBot);
+
+                        if (myAction.startsWith("COMPLETE") && oppAction.startsWith("COMPLETE"))
+                            oppBot.score++;
                     }
+
+                    if (!myAction.equals("WAIT") || gene == Gene.WAIT)
+                        geneIndex++;
+
+                    // switch to new day
+                    if (myBot.isWaiting && oppBot.isWaiting)
+                        state.nextDay();
                 }
+            }
+
+            static void fitness(State state, DNA solution) {
+                int score = 0;
+
+                solution.score = score;
+            }
+        }
+
+        static class DNA {
+            final Gene[] genes = new Gene[GENES_COUNT];
+
+            int score;
+
+            static DNA random() {
+               final DNA dna = new DNA();
+               for (int i = 0; i < GENES_COUNT; i++)
+                   dna.genes[i] = Gene.random();
+               return dna;
+            }
+
+            static DNA crossover(DNA parent1, DNA parent2) {
+                final DNA child = new DNA();
+                for (int i = 0; i < GENES_COUNT; i++) {
+                    child.genes[i] = RAND.nextFloat() < MUTATION_CHANCE
+                            ? Gene.random()
+                            : (RAND.nextFloat() < 0.5 ? parent1 : parent2).genes[i];
+                }
+                return child;
             }
         }
 
@@ -696,6 +784,12 @@ class Player {
                     return "WAIT";
                 }
             };
+
+            static final int COUNT = values().length;
+
+            static Gene random() {
+                return Gene.values()[RAND.nextInt(COUNT)];
+            }
 
             abstract String act(State state);
         }
