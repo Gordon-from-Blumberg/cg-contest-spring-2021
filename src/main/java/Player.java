@@ -465,7 +465,7 @@ class Player {
                             continue;
 
                         for (final Cell cellToSeed : tree.seedCells()) {
-                            if (!treeMap.containsKey(cellToSeed.index)) {
+                            if (cellToSeed.richness > UNUSABLE && !treeMap.containsKey(cellToSeed.index)) {
                                 return state.myBot.sun >= tree.seedCost()
                                         ? "SEED " + tree.cell.index + " " + cellToSeed.index
                                         : "WAIT";
@@ -479,7 +479,20 @@ class Player {
             SEED_ON_RICH {
                 @Override
                 String act(State state) {
+                    final Map<Integer, Tree> treeMap = state.treeMap;
+                    for (final Tree tree : state.myBot.trees) {
+                        if (tree.isDormant)
+                            continue;
 
+                        for (final Cell cellToSeed : tree.seedCells()) {
+                            if (cellToSeed.richness == RICH_CELL && !treeMap.containsKey(cellToSeed.index)) {
+                                return state.myBot.sun >= tree.seedCost()
+                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+                                        : "WAIT";
+                            }
+                        }
+                    }
+                    return "WAIT";
                 }
             },
 
@@ -494,6 +507,46 @@ class Player {
                 @Override
                 String act(State state) {
 
+                }
+            },
+
+            SEED_ON_MEDIUM {
+                @Override
+                String act(State state) {
+                    final Map<Integer, Tree> treeMap = state.treeMap;
+                    for (final Tree tree : state.myBot.trees) {
+                        if (tree.isDormant)
+                            continue;
+
+                        for (final Cell cellToSeed : tree.seedCells()) {
+                            if (cellToSeed.richness == MEDIUM_CELL && !treeMap.containsKey(cellToSeed.index)) {
+                                return state.myBot.sun >= tree.seedCost()
+                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+                                        : "WAIT";
+                            }
+                        }
+                    }
+                    return "WAIT";
+                }
+            },
+
+            SEED_ON_POOR {
+                @Override
+                String act(State state) {
+                    final Map<Integer, Tree> treeMap = state.treeMap;
+                    for (final Tree tree : state.myBot.trees) {
+                        if (tree.isDormant)
+                            continue;
+
+                        for (final Cell cellToSeed : tree.seedCells()) {
+                            if (cellToSeed.richness == POOR_CELL && !treeMap.containsKey(cellToSeed.index)) {
+                                return state.myBot.sun >= tree.seedCost()
+                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+                                        : "WAIT";
+                            }
+                        }
+                    }
+                    return "WAIT";
                 }
             },
 
