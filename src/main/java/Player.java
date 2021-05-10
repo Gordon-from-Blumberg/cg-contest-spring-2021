@@ -574,21 +574,6 @@ class Player {
                 }
             },
 
-            GROW_OUT_OF_SHADOWS {
-                @Override
-                String act(State state) {
-
-                    return "WAIT";
-                }
-            },
-
-            GROW_TO_SHADOW_OPP {
-                @Override
-                String act(State state) {
-                    return "WAIT";
-                }
-            },
-
             GROW_ON_MEDIUM {
                 @Override
                 String act(State state) {
@@ -609,6 +594,57 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
+                    return "WAIT";
+                }
+            },
+
+            GROW_SEED {
+                @Override
+                String act(State state) {
+                    for (Tree tree : state.myBot.trees) {
+                        if (tree.size == Player.SEED) {
+                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    }
+                    return "WAIT";
+                }
+            },
+
+            GROW_SMALL {
+                @Override
+                String act(State state) {
+                    for (Tree tree : state.myBot.trees) {
+                        if (tree.size == SMALL_TREE) {
+                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    }
+                    return "WAIT";
+                }
+            },
+
+            GROW_MEDIUM {
+                @Override
+                String act(State state) {
+                    for (Tree tree : state.myBot.trees) {
+                        if (tree.size == MEDIUM_TREE) {
+                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+                        }
+                    }
+                    return "WAIT";
+                }
+            },
+
+            GROW_OUT_OF_SHADOWS {
+                @Override
+                String act(State state) {
+
+                    return "WAIT";
+                }
+            },
+
+            GROW_TO_SHADOW_OPP {
+                @Override
+                String act(State state) {
                     return "WAIT";
                 }
             },
