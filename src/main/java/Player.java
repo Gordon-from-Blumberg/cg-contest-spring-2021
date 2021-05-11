@@ -26,10 +26,13 @@ class Player {
 
     static final Random RAND = new Random(47);
 
+    static int cellCount;
+
     public static void main(String[] args) {
         Scanner in = new Scanner(System.in);
-        Cell[] cells = new Cell[in.nextInt()];
-        for (int i = 0; i < cells.length; i++) {
+        cellCount = in.nextInt();
+        Cell[] cells = new Cell[cellCount];
+        for (int i = 0; i < cellCount; i++) {
             cells[i] = new Cell(in.nextInt(), in.nextInt(),
                     in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt());
         }
@@ -52,7 +55,7 @@ class Player {
             for (int i = 0; i < numberOfTrees; i++) {
                 state.addTree(in.nextInt(), in.nextInt(), in.nextInt() != 0, in.nextInt() != 0);
             }
-            state.setShadows(new int[cells.length]);
+            state.setShadows(new int[cellCount]);
 
             String[] legalActions = new String[in.nextInt()];
 
@@ -545,17 +548,10 @@ class Player {
                     System.err.println(solution);
                 while (state.day <= LAST_DAY && geneIndex < GENES_COUNT) {
                     final Gene gene = solution.genes[geneIndex];
-                    String myAction = myBot.isWaiting ? "WAIT" : gene.act(state);
+                    String myAction = myBot.isWaiting ? "WAIT" : gene.action;
                     if (debug) {
                         System.err.println("Gene #" + geneIndex + " = " + gene);
                         System.err.println("Action = " + myAction);
-                    }
-
-                    if (myAction.equals("ERROR")) {
-                        solution.errorGeneInd = geneIndex;
-                        solution.errorGene = gene;
-                        myAction = "WAIT";
-                        geneIndex++;
                     }
 
                     if (solution.firstAction == null)
@@ -568,6 +564,24 @@ class Player {
 
                     final Tree myActingTree = myActionParts.length > 1 ? treeMap.get(Integer.parseInt(myActionParts[1])) : null;
                     final Tree oppActingTree = oppActionParts.length > 1 ? treeMap.get(Integer.parseInt(oppActionParts[1])) : null;
+
+                    if (!myAction.equals("WAIT")) {
+                        if (myActingTree == null || !myActingTree.isMine || myActingTree.isDormant
+                                || (myActionParts[0].equals("GROW") && (myActingTree.size == LARGE_TREE || myBot.sun < myActingTree.growCost()))
+                                || (myActionParts[0].equals("COMPLETE") && (myActingTree.size != LARGE_TREE || myBot.sun < COMPLETE_BASE_COST))) {
+                            myAction = "WAIT";
+                            myActionParts[0] = myAction;
+                        } else if (myActionParts[0].equals("SEED")) {
+                            final Cell seedTarget = state.cells[Integer.parseInt(myActionParts[2])];
+                            if (seedTarget.richness == UNUSABLE
+                                    || !myActingTree.seedCells().contains(seedTarget)
+                                    || state.treeMap.containsKey(seedTarget.index)
+                                    || myBot.sun < myActingTree.seedCost()) {
+                                myAction = "WAIT";
+                                myActionParts[0] = myAction;
+                            }
+                        }
+                    }
 
                     if (myAction.startsWith("SEED")
                             && oppAction.startsWith("SEED")
@@ -670,262 +684,295 @@ class Player {
             }
         }
 
-        enum Gene {
-            WAIT {
-                @Override
-                String act(State state) {
-                    return "WAIT";
-                }
-            },
+        static class Gene {
+            private static final int BASE_ACTION_COUNT = 4;
+            private static final String[] ACTIONS = new String[] { "WAIT", "SEED", "GROW", "COMPLETE" };
 
-            SEED {
-                @Override
-                String act(State state) {
-                    final Map<Integer, Tree> treeMap = state.treeMap;
-                    for (final Tree tree : state.myBot.trees) {
-                        if (tree.isDormant)
-                            continue;
+            static final Gene WAIT = new Gene("WAIT");
 
-                        for (final Cell cellToSeed : tree.seedCells()) {
-                            if (cellToSeed.richness > UNUSABLE && !treeMap.containsKey(cellToSeed.index)) {
-                                return state.myBot.sun >= tree.seedCost()
-                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
-                                        : "WAIT";
-                            }
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
+            private final String action;
 
-            SEED_ON_RICH {
-                @Override
-                String act(State state) {
-                    final Map<Integer, Tree> treeMap = state.treeMap;
-                    for (final Tree tree : state.myBot.trees) {
-                        if (tree.isDormant)
-                            continue;
-
-                        for (final Cell cellToSeed : tree.seedCells()) {
-                            if (cellToSeed.richness == RICH_CELL && !treeMap.containsKey(cellToSeed.index)) {
-                                return state.myBot.sun >= tree.seedCost()
-                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
-                                        : "WAIT";
-                            }
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            SEED_OUT_OF_SHADOWS {
-                @Override
-                String act(State state) {
-                    return "ERROR";
-                }
-            },
-
-            SEED_TO_SHADOW_OPP {
-                @Override
-                String act(State state) {
-                    return "ERROR";
-                }
-            },
-
-            SEED_ON_MEDIUM {
-                @Override
-                String act(State state) {
-                    final Map<Integer, Tree> treeMap = state.treeMap;
-                    for (final Tree tree : state.myBot.trees) {
-                        if (tree.isDormant)
-                            continue;
-
-                        for (final Cell cellToSeed : tree.seedCells()) {
-                            if (cellToSeed.richness == MEDIUM_CELL && !treeMap.containsKey(cellToSeed.index)) {
-                                return state.myBot.sun >= tree.seedCost()
-                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
-                                        : "WAIT";
-                            }
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            SEED_ON_POOR {
-                @Override
-                String act(State state) {
-                    final Map<Integer, Tree> treeMap = state.treeMap;
-                    for (final Tree tree : state.myBot.trees) {
-                        if (tree.isDormant)
-                            continue;
-
-                        for (final Cell cellToSeed : tree.seedCells()) {
-                            if (cellToSeed.richness == POOR_CELL && !treeMap.containsKey(cellToSeed.index)) {
-                                return state.myBot.sun >= tree.seedCost()
-                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
-                                        : "WAIT";
-                            }
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size < LARGE_TREE) {
-                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW_ON_RICH {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == RICH_CELL) {
-                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW_ON_MEDIUM {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
-                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW_ON_POOR {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == POOR_CELL) {
-                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW_SEED {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size == Player.SEED) {
-                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW_SMALL {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size == SMALL_TREE) {
-                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW_MEDIUM {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size == MEDIUM_TREE) {
-                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            GROW_OUT_OF_SHADOWS {
-                @Override
-                String act(State state) {
-
-                    return "ERROR";
-                }
-            },
-
-            GROW_TO_SHADOW_OPP {
-                @Override
-                String act(State state) {
-                    return "ERROR";
-                }
-            },
-
-            COMPLETE {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size == LARGE_TREE) {
-                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            COMPLETE_RICH {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == RICH_CELL) {
-                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            COMPLETE_MEDIUM {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
-                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            },
-
-            COMPLETE_POOR {
-                @Override
-                String act(State state) {
-                    for (Tree tree : state.myBot.trees) {
-                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == POOR_CELL) {
-                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
-                        }
-                    }
-                    return "ERROR";
-                }
-            };
-
-            static final int COUNT = values().length;
-
-            static Gene random() {
-                return Gene.values()[RAND.nextInt(COUNT)];
+            Gene(String action) {
+                this.action = action;
             }
 
-            abstract String act(State state);
+            static Gene random() {
+                final String baseAction = ACTIONS[RAND.nextInt(BASE_ACTION_COUNT)];
+                switch (baseAction) {
+                    case "WAIT":
+                        return WAIT;
+                    case "GROW":
+                    case "COMPLETE":
+                        return new Gene(baseAction + " " + RAND.nextInt(cellCount));
+                    case "SEED":
+                        return new Gene(baseAction + " " + RAND.nextInt(cellCount) + " " + RAND.nextInt(cellCount));
+                    default:
+                        throw new IllegalStateException();
+                }
+            }
+
+            @Override
+            public String toString() {
+                return action;
+            }
         }
+
+//        enum Gene {
+//            WAIT {
+//                @Override
+//                String act(State state) {
+//                    return "WAIT";
+//                }
+//            },
+//
+//            SEED {
+//                @Override
+//                String act(State state) {
+//                    final Map<Integer, Tree> treeMap = state.treeMap;
+//                    for (final Tree tree : state.myBot.trees) {
+//                        if (tree.isDormant)
+//                            continue;
+//
+//                        for (final Cell cellToSeed : tree.seedCells()) {
+//                            if (cellToSeed.richness > UNUSABLE && !treeMap.containsKey(cellToSeed.index)) {
+//                                return state.myBot.sun >= tree.seedCost()
+//                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+//                                        : "WAIT";
+//                            }
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            SEED_ON_RICH {
+//                @Override
+//                String act(State state) {
+//                    final Map<Integer, Tree> treeMap = state.treeMap;
+//                    for (final Tree tree : state.myBot.trees) {
+//                        if (tree.isDormant)
+//                            continue;
+//
+//                        for (final Cell cellToSeed : tree.seedCells()) {
+//                            if (cellToSeed.richness == RICH_CELL && !treeMap.containsKey(cellToSeed.index)) {
+//                                return state.myBot.sun >= tree.seedCost()
+//                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+//                                        : "WAIT";
+//                            }
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            SEED_OUT_OF_SHADOWS {
+//                @Override
+//                String act(State state) {
+//                    return "ERROR";
+//                }
+//            },
+//
+//            SEED_TO_SHADOW_OPP {
+//                @Override
+//                String act(State state) {
+//                    return "ERROR";
+//                }
+//            },
+//
+//            SEED_ON_MEDIUM {
+//                @Override
+//                String act(State state) {
+//                    final Map<Integer, Tree> treeMap = state.treeMap;
+//                    for (final Tree tree : state.myBot.trees) {
+//                        if (tree.isDormant)
+//                            continue;
+//
+//                        for (final Cell cellToSeed : tree.seedCells()) {
+//                            if (cellToSeed.richness == MEDIUM_CELL && !treeMap.containsKey(cellToSeed.index)) {
+//                                return state.myBot.sun >= tree.seedCost()
+//                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+//                                        : "WAIT";
+//                            }
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            SEED_ON_POOR {
+//                @Override
+//                String act(State state) {
+//                    final Map<Integer, Tree> treeMap = state.treeMap;
+//                    for (final Tree tree : state.myBot.trees) {
+//                        if (tree.isDormant)
+//                            continue;
+//
+//                        for (final Cell cellToSeed : tree.seedCells()) {
+//                            if (cellToSeed.richness == POOR_CELL && !treeMap.containsKey(cellToSeed.index)) {
+//                                return state.myBot.sun >= tree.seedCost()
+//                                        ? "SEED " + tree.cell.index + " " + cellToSeed.index
+//                                        : "WAIT";
+//                            }
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size < LARGE_TREE) {
+//                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_ON_RICH {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == RICH_CELL) {
+//                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_ON_MEDIUM {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
+//                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_ON_POOR {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size < LARGE_TREE && tree.cell.richness == POOR_CELL) {
+//                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_SEED {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size == Player.SEED) {
+//                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_SMALL {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size == SMALL_TREE) {
+//                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_MEDIUM {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size == MEDIUM_TREE) {
+//                            return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_OUT_OF_SHADOWS {
+//                @Override
+//                String act(State state) {
+//
+//                    return "ERROR";
+//                }
+//            },
+//
+//            GROW_TO_SHADOW_OPP {
+//                @Override
+//                String act(State state) {
+//                    return "ERROR";
+//                }
+//            },
+//
+//            COMPLETE {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size == LARGE_TREE) {
+//                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            COMPLETE_RICH {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == RICH_CELL) {
+//                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            COMPLETE_MEDIUM {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == MEDIUM_CELL) {
+//                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            },
+//
+//            COMPLETE_POOR {
+//                @Override
+//                String act(State state) {
+//                    for (Tree tree : state.myBot.trees) {
+//                        if (!tree.isDormant && tree.size == LARGE_TREE && tree.cell.richness == POOR_CELL) {
+//                            return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
+//                        }
+//                    }
+//                    return "ERROR";
+//                }
+//            };
+//
+//            static final int COUNT = values().length;
+//
+//            static Gene random() {
+//                return Gene.values()[RAND.nextInt(COUNT)];
+//            }
+//
+//            abstract String act(State state);
+//        }
     }
 }
