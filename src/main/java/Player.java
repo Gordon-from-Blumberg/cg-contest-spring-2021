@@ -571,6 +571,7 @@ class Player {
                                 || (myActionParts[0].equals("COMPLETE") && (myActingTree.size != LARGE_TREE || myBot.sun < COMPLETE_BASE_COST))) {
                             myAction = "WAIT";
                             myActionParts[0] = myAction;
+                            solution.errorGeneInd = geneIndex;
                         } else if (myActionParts[0].equals("SEED")) {
                             final Cell seedTarget = state.cells[Integer.parseInt(myActionParts[2])];
                             if (seedTarget.richness == UNUSABLE
@@ -579,6 +580,7 @@ class Player {
                                     || myBot.sun < myActingTree.seedCost()) {
                                 myAction = "WAIT";
                                 myActionParts[0] = myAction;
+                                solution.errorGeneInd = geneIndex;
                             }
                         }
                     }
@@ -598,9 +600,6 @@ class Player {
                             oppBot.score++;
                     }
 
-                    if (!myAction.equals("WAIT") || gene == Gene.WAIT)
-                        geneIndex++;
-
                     // switch to new day
                     if (myBot.isWaiting && oppBot.isWaiting) {
                         if (state.day == LAST_DAY) {
@@ -610,6 +609,8 @@ class Player {
                             state.nextDay();
                         }
                     }
+
+                    geneIndex++;
                 }
             }
 
