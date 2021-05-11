@@ -1,4 +1,6 @@
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -18,7 +20,7 @@ class Player {
     static final int REST_TURNS = 100 - 15;
 
     static final int GENES_COUNT = 100;
-    static final int POPULATION = 20;
+    static final int POPULATION = 50;
     static final int MATING_POOL_SIZE = 150;
     static final float MUTATION_CHANCE = 0.05f;
 
@@ -85,7 +87,7 @@ class Player {
 
                 for (int i = 0; i < POPULATION; i++) {
                     final State copy = state.copy();
-                    State.Genetic.simulate(copy, population[i]);
+                    State.Genetic.simulate(copy, population[i], false);
                     State.Genetic.fitness(copy, population[i]);
                 }
 
@@ -106,12 +108,22 @@ class Player {
                 }
             }
 
-//            assert bestSolution != null;
+//            Arrays.sort(population, (dna1, dna2) -> dna2.score - dna1.score);
 //            System.err.println("generation #" + generationNumber);
-//            System.err.println("best score = " + bestSolution.score);
-//            System.err.println("best solution = " + bestSolution);
+//            if (bestSolution != null) {
+//                System.err.println("Day after simulation " + bestSolution.state.day);
+//                if (bestSolution.state.gameOver)
+//                    System.err.println("Game over: my final score " + bestSolution.state.myBot.getFinalScore() + ", opp " + bestSolution.state.oppBot.getFinalScore());
+//                if (bestSolution.errorGeneInd > -1)
+//                    System.err.println("Solution with error gene " + bestSolution.errorGene + " #" + bestSolution.errorGeneInd);
+//                System.err.println(Stream.of(population).map(dna -> String.valueOf(dna.score)).collect(Collectors.joining(",")));
+//                System.err.println("My score " + bestSolution.state.myBot.score + ", opp " + bestSolution.state.oppBot.score);
+//                System.err.println("My sun " + bestSolution.state.myBot.sun + ", opp " + bestSolution.state.oppBot.sun);
+//                System.err.println("My trees " + bestSolution.state.myBot.trees.size() + ", opp " + bestSolution.state.oppBot.trees.size());
+//                System.err.println("best solution = " + bestSolution);
+//            }
 
-            System.out.println(bestSolution.firstAction);
+            System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
 //            System.out.println(state.myBot.act());
 
             allowedDelay = REST_TURNS;
@@ -524,16 +536,31 @@ class Player {
         }
 
         static class Genetic {
-            static void simulate(State state, DNA solution) {
+            static void simulate(State state, DNA solution, boolean debug) {
                 final Map<Integer, Tree> treeMap = state.treeMap;
                 final Bot myBot = state.myBot;
                 final Bot oppBot = state.oppBot;
                 int geneIndex = 0;
+                if (debug)
+                    System.err.println(solution);
                 while (state.day <= LAST_DAY && geneIndex < GENES_COUNT) {
                     final Gene gene = solution.genes[geneIndex];
-                    final String myAction = myBot.isWaiting ? "WAIT" : gene.act(state);
+                    String myAction = myBot.isWaiting ? "WAIT" : gene.act(state);
+                    if (debug) {
+                        System.err.println("Gene #" + geneIndex + " = " + gene);
+                        System.err.println("Action = " + myAction);
+                    }
+
+                    if (myAction.equals("ERROR")) {
+                        solution.errorGeneInd = geneIndex;
+                        solution.errorGene = gene;
+                        myAction = "WAIT";
+                        geneIndex++;
+                    }
+
                     if (solution.firstAction == null)
                         solution.firstAction = myAction;
+
                     final String oppAction = oppBot.isWaiting ? "WAIT" : oppBot.act();
 
                     final String[] myActionParts = myAction.split(" ");
@@ -561,27 +588,42 @@ class Player {
                         geneIndex++;
 
                     // switch to new day
-                    if (myBot.isWaiting && oppBot.isWaiting)
+                    if (myBot.isWaiting && oppBot.isWaiting) {
                         if (state.day == LAST_DAY) {
                             state.gameOver = true;
                             break;
                         } else {
                             state.nextDay();
                         }
+                    }
                 }
             }
 
             static void fitness(State state, DNA solution) {
-                int score = state.myBot.getFinalScore();
+                final Bot myBot = state.myBot;
+                int score;
                 if (state.gameOver) {
+                    score = myBot.getFinalScore();
                     final int oppScore = state.oppBot.getFinalScore();
                     if (score > oppScore)
                         score *= 2;
                     else if (score < oppScore)
                         score /= 2;
+                } else {
+                    int treeScore = 0;
+                    for (Tree tree : myBot.trees)
+                        treeScore += 2 * tree.size + 1;
+
+                    score = 200 * state.day / 23 * 3 * myBot.score
+                            + 200 * (24 - state.day) / 23 * 2 * myBot.sun
+                            + 100 * treeScore;
                 }
 
+                if (solution.errorGeneInd > -1)
+                    score /= 2 * (GENES_COUNT - solution.errorGeneInd);
+
                 solution.score = score;
+                solution.state = state;
             }
         }
 
@@ -590,12 +632,15 @@ class Player {
 
             int score;
             String firstAction;
+            State state;
+            int errorGeneInd = -1;
+            Gene errorGene;
 
             static DNA random() {
-               final DNA dna = new DNA();
-               for (int i = 0; i < GENES_COUNT; i++)
-                   dna.genes[i] = Gene.random();
-               return dna;
+                final DNA dna = new DNA();
+                for (int i = 0; i < GENES_COUNT; i++)
+                    dna.genes[i] = Gene.random();
+                return dna;
             }
 
             static DNA crossover(DNA parent1, DNA parent2) {
@@ -649,7 +694,7 @@ class Player {
                             }
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -669,21 +714,21 @@ class Player {
                             }
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
             SEED_OUT_OF_SHADOWS {
                 @Override
                 String act(State state) {
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
             SEED_TO_SHADOW_OPP {
                 @Override
                 String act(State state) {
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -703,7 +748,7 @@ class Player {
                             }
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -723,7 +768,7 @@ class Player {
                             }
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -735,7 +780,7 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -747,7 +792,7 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -759,7 +804,7 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -771,7 +816,7 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -783,7 +828,7 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -795,7 +840,7 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -807,7 +852,7 @@ class Player {
                             return state.myBot.sun >= tree.growCost() ? "GROW " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -815,14 +860,14 @@ class Player {
                 @Override
                 String act(State state) {
 
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
             GROW_TO_SHADOW_OPP {
                 @Override
                 String act(State state) {
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -834,7 +879,7 @@ class Player {
                             return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -846,7 +891,7 @@ class Player {
                             return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -858,7 +903,7 @@ class Player {
                             return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             },
 
@@ -870,7 +915,7 @@ class Player {
                             return state.myBot.sun >= COMPLETE_BASE_COST ? "COMPLETE " + tree.cell.index : "WAIT";
                         }
                     }
-                    return "WAIT";
+                    return "ERROR";
                 }
             };
 
