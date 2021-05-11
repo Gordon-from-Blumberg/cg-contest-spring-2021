@@ -74,7 +74,7 @@ class Player {
             int generationNumber = 0;
             int realMatingPoolSize = 0;
             State.DNA bestSolution = null;
-            while (System.currentTimeMillis() < endTime && false) {
+            while (System.currentTimeMillis() < endTime) {
                 generationNumber++;
                 if (matingPool[0] == null) {
                     population[0] = population[0] != null ? population[0].toNextTurn() : State.DNA.random();
@@ -111,23 +111,23 @@ class Player {
                 }
             }
 
-//            Arrays.sort(population, (dna1, dna2) -> dna2.score - dna1.score);
-//            System.err.println("generation #" + generationNumber);
-//            if (bestSolution != null) {
-//                System.err.println("Day after simulation " + bestSolution.state.day);
-//                if (bestSolution.state.gameOver)
-//                    System.err.println("Game over: my final score " + bestSolution.state.myBot.getFinalScore() + ", opp " + bestSolution.state.oppBot.getFinalScore());
-//                if (bestSolution.errorGeneInd > -1)
-//                    System.err.println("Solution with error gene " + bestSolution.errorGene + " #" + bestSolution.errorGeneInd);
-//                System.err.println(Stream.of(population).map(dna -> String.valueOf(dna.score)).collect(Collectors.joining(",")));
-//                System.err.println("My score " + bestSolution.state.myBot.score + ", opp " + bestSolution.state.oppBot.score);
-//                System.err.println("My sun " + bestSolution.state.myBot.sun + ", opp " + bestSolution.state.oppBot.sun);
-//                System.err.println("My trees " + bestSolution.state.myBot.trees.size() + ", opp " + bestSolution.state.oppBot.trees.size());
-//                System.err.println("best solution = " + bestSolution);
-//            }
+            Arrays.sort(population, (dna1, dna2) -> dna2.score - dna1.score);
+            System.err.println("generation #" + generationNumber);
+            if (bestSolution != null) {
+                System.err.println("Day after simulation " + bestSolution.state.day);
+                if (bestSolution.state.gameOver)
+                    System.err.println("Game over: final score " + bestSolution.state.myBot.getFinalScore() + " vs " + bestSolution.state.oppBot.getFinalScore());
+                if (bestSolution.errorGeneInd > -1)
+                    System.err.println("Solution with error gene " + bestSolution.errorGene + " #" + bestSolution.errorGeneInd);
+                System.err.println(Stream.of(population).map(dna -> String.valueOf(dna.score)).collect(Collectors.joining(",")));
+                System.err.println("My score " + bestSolution.state.myBot.score + ", opp " + bestSolution.state.oppBot.score);
+                System.err.println("My sun " + bestSolution.state.myBot.sun + ", opp " + bestSolution.state.oppBot.sun);
+                System.err.println("My trees " + bestSolution.state.myBot.trees.size() + ", opp " + bestSolution.state.oppBot.trees.size());
+                System.err.println("best solution = " + bestSolution);
+            }
 
-//            System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
-            System.out.println(state.myBot.act());
+            System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
+//            System.out.println(state.myBot.act());
 
             allowedDelay = REST_TURNS;
         }
@@ -445,6 +445,9 @@ class Player {
                                 && tree.size < LARGE_TREE
                                 && (toGrow == null || toGrow.cell.richness < tree.cell.richness))
                             toGrow = tree;
+
+                        if (tree.size == LARGE_TREE && (toComplete == null || toComplete.cell.richness < tree.cell.richness))
+                            toComplete = tree;
                     }
                 }
 
@@ -571,7 +574,8 @@ class Player {
                                 || (myActionParts[0].equals("COMPLETE") && (myActingTree.size != LARGE_TREE || myBot.sun < COMPLETE_BASE_COST))) {
                             myAction = "WAIT";
                             myActionParts[0] = myAction;
-                            solution.errorGeneInd = geneIndex;
+                            if (solution.errorGeneInd == -1)
+                                solution.errorGeneInd = geneIndex;
                         } else if (myActionParts[0].equals("SEED")) {
                             final Cell seedTarget = state.cells[Integer.parseInt(myActionParts[2])];
                             if (seedTarget.richness == UNUSABLE
@@ -580,7 +584,8 @@ class Player {
                                     || myBot.sun < myActingTree.seedCost()) {
                                 myAction = "WAIT";
                                 myActionParts[0] = myAction;
-                                solution.errorGeneInd = geneIndex;
+                                if (solution.errorGeneInd == -1)
+                                    solution.errorGeneInd = geneIndex;
                             }
                         }
                     }
