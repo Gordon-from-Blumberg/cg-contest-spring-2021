@@ -74,7 +74,7 @@ class Player {
             int generationNumber = 0;
             int realMatingPoolSize = 0;
             State.DNA bestSolution = null;
-            while (System.currentTimeMillis() < endTime) {
+            while (System.currentTimeMillis() < endTime && false) {
                 generationNumber++;
                 if (matingPool[0] == null) {
                     population[0] = population[0] != null ? population[0].toNextTurn() : State.DNA.random();
@@ -126,8 +126,8 @@ class Player {
 //                System.err.println("best solution = " + bestSolution);
 //            }
 
-            System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
-//            System.out.println(state.myBot.act());
+//            System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
+            System.out.println(state.myBot.act());
 
             allowedDelay = REST_TURNS;
         }
