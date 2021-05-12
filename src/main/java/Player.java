@@ -26,10 +26,13 @@ class Player {
 
     static final Random RAND = new Random(47);
 
+    static int cellCount;
+
     public static void main(String[] args) {
         Scanner in = new Scanner(System.in);
-        Cell[] cells = new Cell[in.nextInt()];
-        for (int i = 0; i < cells.length; i++) {
+        cellCount = in.nextInt();
+        Cell[] cells = new Cell[cellCount];
+        for (int i = 0; i < cellCount; i++) {
             cells[i] = new Cell(in.nextInt(), in.nextInt(),
                     in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt(), in.nextInt());
         }
@@ -52,7 +55,7 @@ class Player {
             for (int i = 0; i < numberOfTrees; i++) {
                 state.addTree(in.nextInt(), in.nextInt(), in.nextInt() != 0, in.nextInt() != 0);
             }
-            state.setShadows(new int[cells.length]);
+            state.setShadows(new int[cellCount]);
 
             String[] legalActions = new String[in.nextInt()];
 
@@ -108,20 +111,20 @@ class Player {
                 }
             }
 
-//            Arrays.sort(population, (dna1, dna2) -> dna2.score - dna1.score);
-//            System.err.println("generation #" + generationNumber);
-//            if (bestSolution != null) {
-//                System.err.println("Day after simulation " + bestSolution.state.day);
-//                if (bestSolution.state.gameOver)
-//                    System.err.println("Game over: my final score " + bestSolution.state.myBot.getFinalScore() + ", opp " + bestSolution.state.oppBot.getFinalScore());
-//                if (bestSolution.errorGeneInd > -1)
-//                    System.err.println("Solution with error gene " + bestSolution.errorGene + " #" + bestSolution.errorGeneInd);
-//                System.err.println(Stream.of(population).map(dna -> String.valueOf(dna.score)).collect(Collectors.joining(",")));
-//                System.err.println("My score " + bestSolution.state.myBot.score + ", opp " + bestSolution.state.oppBot.score);
-//                System.err.println("My sun " + bestSolution.state.myBot.sun + ", opp " + bestSolution.state.oppBot.sun);
-//                System.err.println("My trees " + bestSolution.state.myBot.trees.size() + ", opp " + bestSolution.state.oppBot.trees.size());
-//                System.err.println("best solution = " + bestSolution);
-//            }
+            Arrays.sort(population, (dna1, dna2) -> dna2.score - dna1.score);
+            System.err.println("generation #" + generationNumber);
+            if (bestSolution != null) {
+                System.err.println("Day after simulation " + bestSolution.state.day);
+                if (bestSolution.state.gameOver)
+                    System.err.println("Game over: final score " + bestSolution.state.myBot.getFinalScore() + " vs " + bestSolution.state.oppBot.getFinalScore());
+                if (bestSolution.errorGeneInd > -1)
+                    System.err.println("Solution with error gene " + bestSolution.errorGene + " #" + bestSolution.errorGeneInd);
+                System.err.println(Stream.of(population).map(dna -> String.valueOf(dna.score)).collect(Collectors.joining(",")));
+                System.err.println("My score " + bestSolution.state.myBot.score + ", opp " + bestSolution.state.oppBot.score);
+                System.err.println("My sun " + bestSolution.state.myBot.sun + ", opp " + bestSolution.state.oppBot.sun);
+                System.err.println("My trees " + bestSolution.state.myBot.trees.size() + ", opp " + bestSolution.state.oppBot.trees.size());
+                System.err.println("best solution = " + bestSolution);
+            }
 
             System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
 //            System.out.println(state.myBot.act());
@@ -442,6 +445,9 @@ class Player {
                                 && tree.size < LARGE_TREE
                                 && (toGrow == null || toGrow.cell.richness < tree.cell.richness))
                             toGrow = tree;
+
+                        if (tree.size == LARGE_TREE && (toComplete == null || toComplete.cell.richness < tree.cell.richness))
+                            toComplete = tree;
                     }
                 }
 
@@ -552,10 +558,11 @@ class Player {
                     }
 
                     if (myAction.equals("ERROR")) {
-                        solution.errorGeneInd = geneIndex;
-                        solution.errorGene = gene;
+                        if (solution.errorGeneInd == -1) {
+                            solution.errorGeneInd = geneIndex;
+                            solution.errorGene = gene;
+                        }
                         myAction = "WAIT";
-                        geneIndex++;
                     }
 
                     if (solution.firstAction == null)
@@ -584,9 +591,6 @@ class Player {
                             oppBot.score++;
                     }
 
-                    if (!myAction.equals("WAIT") || gene == Gene.WAIT)
-                        geneIndex++;
-
                     // switch to new day
                     if (myBot.isWaiting && oppBot.isWaiting) {
                         if (state.day == LAST_DAY) {
@@ -596,6 +600,8 @@ class Player {
                             state.nextDay();
                         }
                     }
+
+                    geneIndex++;
                 }
             }
 
