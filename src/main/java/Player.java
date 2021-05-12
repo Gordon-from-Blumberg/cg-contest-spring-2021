@@ -74,7 +74,7 @@ class Player {
             int generationNumber = 0;
             int realMatingPoolSize = 0;
             State.DNA bestSolution = null;
-            while (System.currentTimeMillis() < endTime) {
+            while (System.currentTimeMillis() < endTime && false) {
                 generationNumber++;
                 if (matingPool[0] == null) {
                     population[0] = population[0] != null ? population[0].toNextTurn() : State.DNA.random();
@@ -275,6 +275,27 @@ class Player {
             });
         }
 
+        void maxSun(ScoreInfo myInfo, ScoreInfo oppInfo) {
+            final State state = copy();
+            while (state.day <= LAST_DAY)
+                state.nextDay();
+            myInfo.maxSun = state.myBot.sun;
+            oppInfo.maxSun = state.oppBot.sun;
+        }
+
+        void maxScore(ScoreInfo myInfo, ScoreInfo oppInfo) {
+            final State state = copy();
+            final Bot myBot = state.myBot;
+            final Bot oppBot = state.oppBot;
+            while (state.day < LAST_DAY || !myBot.isWaiting || !oppBot.isWaiting) {
+                oppBot.growToComplete();
+                myBot.growToComplete();
+
+                if (myBot.isWaiting && oppBot.isWaiting)
+                    state.nextDay();
+            }
+        }
+
         void addTree(int cellIndex, int size, boolean isMine, boolean isDormant) {
             (isMine ? myBot : oppBot).addTree(cellIndex, size, isDormant);
         }
@@ -411,28 +432,32 @@ class Player {
                 final State state = State.this;
                 int bestScore = 0;
                 String bestAction = null;
+                final ScoreInfo myScoreInfo = new ScoreInfo();
+                final ScoreInfo oppScoreInfo = new ScoreInfo();
 
                 for (String action : actions) {
                     final State copy = state.copy();
                     final Bot myBot = copy.myBot;
+                    final Bot oppBot = copy.oppBot;
                     final String[] actionParts = action.split(" ");
                     final Tree actingTree = actionParts.length > 1 ? copy.treeMap.get(Integer.parseInt(actionParts[1])) : null;
-                    copy.applyAction(actionParts, actingTree, copy.myBot);
+                    copy.applyAction(actionParts, actingTree, this);
 
-                    int treeScore = 0;
-                    for (Tree tree : myBot.trees)
-                        treeScore += tree.size + 1;
+                    myBot.score(myScoreInfo);
+                    oppBot.score(oppScoreInfo);
 
-                    int score = 200 * copy.day / 23 * 3 * myBot.score
-                            + 200 * (24 - copy.day) / 23 * 2 * myBot.sun
-                            + 100 * treeScore;
+                    System.err.println("Action " + action + " -->");
+                    System.err.println(String.format("Score %s vs %s", myScoreInfo.scoreScore, oppScoreInfo.scoreScore));
+                    System.err.println(String.format("Sun %s vs %s", myScoreInfo.sunScore, oppScoreInfo.sunScore));
+                    System.err.println(String.format("Tree %s vs %s", myScoreInfo.treeScore, oppScoreInfo.treeScore));
+                    copy.maxSun(myScoreInfo, oppScoreInfo);
+                    System.err.println(String.format("Max sun %s vs %s", myScoreInfo.maxSun, oppScoreInfo.maxSun));
+                    copy.maxScore(myScoreInfo, oppScoreInfo);
+                    System.err.println(String.format("Max score %s vs %s", myScoreInfo.maxScore, oppScoreInfo.maxScore));
 
-                    score += 100 * (myBot.maxSun() - copy.oppBot.maxSun());
-
-                    System.err.println(String.format("Action '%s' -> score = %s", action, score));
-                    if (bestAction == null || score > bestScore) {
+                    if (bestAction == null || myScoreInfo.maxScore - oppScoreInfo.maxScore > bestScore) {
                         bestAction = action;
-                        bestScore = score;
+                        bestScore = myScoreInfo.maxScore - oppScoreInfo.maxScore;
                     }
                 }
 
@@ -508,6 +533,45 @@ class Player {
                 return "WAIT";
             }
 
+            void growToComplete() {
+                Tree toComplete = null;
+                if (State.this.day < LAST_DAY) {
+                    Tree toGrow = null;
+                    for (Tree tree : trees) {
+                        if (tree.size == LARGE_TREE && (toComplete == null || toComplete.cell.richness < tree.cell.richness))
+                            toComplete = tree;
+                        if (tree.size < LARGE_TREE && (toGrow == null || toGrow.size < tree.size || toGrow.cell.richness < tree.cell.richness))
+                            toGrow = tree;
+                    }
+
+                    if (toGrow != null && sun >= toGrow.growCost()) {
+                        if (State.this.day > LAST_DAY - 5) {
+                            final State copy = State.this.copy();
+                            copy.treeMap.get(toGrow.cell.index).grow();
+                            final int[] treeCounts = (isMine ? copy.myBot : copy.oppBot).getTreeCounts();
+                            final ScoreInfo myInfo = new ScoreInfo(), oppInfo = new ScoreInfo();
+                            copy.maxSun(myInfo, oppInfo);
+                            final ScoreInfo scoreInfo = isMine ? myInfo : oppInfo;
+                            if (scoreInfo.maxSun >= treeCounts[LARGE_TREE] * COMPLETE_BASE_COST)
+                                toGrow.grow();
+                            else
+                                (isMine ? myBot : oppBot).isWaiting = true;
+                        } else {
+                            toGrow.grow();
+                        }
+                    } else {
+                        (isMine ? myBot : oppBot).isWaiting = true;
+                    }
+                } else if (sun >= COMPLETE_BASE_COST) {
+                    for (Tree tree : trees) {
+                        if (tree.size == LARGE_TREE && (toComplete == null || toComplete.cell.richness < tree.cell.richness))
+                            toComplete = tree;
+                    }
+                    if (toComplete != null)
+                        toComplete.complete();
+                }
+            }
+
             void addTree(int cellIndex, int size, boolean isDormant) {
                 Tree tree = new Tree(cellIndex, size, isMine, isDormant);
                 trees.add(tree);
@@ -531,25 +595,19 @@ class Player {
                 return counts;
             }
 
+            void score(ScoreInfo scoreInfo) {
+                int treeScore = 0;
+                for (Tree tree : trees)
+                    treeScore += tree.size + 1;
+
+                int scoreScore = State.this.day / 23 * 3 * score;
+                int sunScore = (24 - State.this.day) / 23 * 2 * sun;
+
+            }
+
             int getFinalScore() {
                 int sunScore = sun / 3;
                 return 100 * (score + sunScore) + trees.size();
-            }
-
-            int maxSun() {
-                int maxSun = sun, day = State.this.day;
-                while (++day <= LAST_DAY) {
-                    int sunDir = day % 6;
-                    int[] shadows = new int[cells.length];
-//                    setShadows(shadows, myBot.trees, sunDir);
-//                    setShadows(shadows, oppBot.trees, sunDir);
-
-                    for (Tree tree : trees) {
-                        if (tree.size > shadows[tree.cell.index])
-                            maxSun += tree.size;
-                    }
-                }
-                return maxSun;
             }
 
             void print() {
@@ -573,6 +631,10 @@ class Player {
                 }
                 return clone;
             }
+        }
+
+        class ScoreInfo {
+            int scoreScore, sunScore, treeScore, maxSun, maxScore;
         }
 
         static class Genetic {
