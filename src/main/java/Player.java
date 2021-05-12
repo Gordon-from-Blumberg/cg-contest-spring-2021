@@ -111,23 +111,24 @@ class Player {
                 }
             }
 
-            Arrays.sort(population, (dna1, dna2) -> dna2.score - dna1.score);
-            System.err.println("generation #" + generationNumber);
-            if (bestSolution != null) {
-                System.err.println("Day after simulation " + bestSolution.state.day);
-                if (bestSolution.state.gameOver)
-                    System.err.println("Game over: final score " + bestSolution.state.myBot.getFinalScore() + " vs " + bestSolution.state.oppBot.getFinalScore());
-                if (bestSolution.errorGeneInd > -1)
-                    System.err.println("Solution with error gene " + bestSolution.errorGene + " #" + bestSolution.errorGeneInd);
-                System.err.println(Stream.of(population).map(dna -> String.valueOf(dna.score)).collect(Collectors.joining(",")));
-                System.err.println("My score " + bestSolution.state.myBot.score + ", opp " + bestSolution.state.oppBot.score);
-                System.err.println("My sun " + bestSolution.state.myBot.sun + ", opp " + bestSolution.state.oppBot.sun);
-                System.err.println("My trees " + bestSolution.state.myBot.trees.size() + ", opp " + bestSolution.state.oppBot.trees.size());
-                System.err.println("best solution = " + bestSolution);
-            }
+//            Arrays.sort(population, (dna1, dna2) -> dna2.score - dna1.score);
+//            System.err.println("generation #" + generationNumber);
+//            if (bestSolution != null) {
+//                System.err.println("Day after simulation " + bestSolution.state.day);
+//                if (bestSolution.state.gameOver)
+//                    System.err.println("Game over: final score " + bestSolution.state.myBot.getFinalScore() + " vs " + bestSolution.state.oppBot.getFinalScore());
+//                if (bestSolution.errorGeneInd > -1)
+//                    System.err.println("Solution with error gene " + bestSolution.errorGene + " #" + bestSolution.errorGeneInd);
+//                System.err.println(Stream.of(population).map(dna -> String.valueOf(dna.score)).collect(Collectors.joining(",")));
+//                System.err.println("My score " + bestSolution.state.myBot.score + ", opp " + bestSolution.state.oppBot.score);
+//                System.err.println("My sun " + bestSolution.state.myBot.sun + ", opp " + bestSolution.state.oppBot.sun);
+//                System.err.println("My trees " + bestSolution.state.myBot.trees.size() + ", opp " + bestSolution.state.oppBot.trees.size());
+//                System.err.println("best solution = " + bestSolution);
+//            }
 
-            System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
+//            System.out.println(bestSolution != null && bestSolution.firstAction != null ? bestSolution.firstAction : "WAIT");
 //            System.out.println(state.myBot.act());
+            System.out.println(state.myBot.act(legalActions));
 
             allowedDelay = REST_TURNS;
         }
@@ -324,7 +325,8 @@ class Player {
                 Bot owner = owner();
                 owner.score += nutrients + RICHNESS_BONUS[cell.richness];
                 owner.sun -= COMPLETE_BASE_COST;
-                nutrients--;
+                if (nutrients > 0)
+                    nutrients--;
                 owner.trees.remove(this);
                 treeMap.remove(cell.index);
             }
@@ -403,6 +405,38 @@ class Player {
             void update(int sun, int score, boolean isWaiting) {
                 update(sun, score);
                 this.isWaiting = isWaiting;
+            }
+
+            String act(String[] actions) {
+                final State state = State.this;
+                int bestScore = 0;
+                String bestAction = null;
+
+                for (String action : actions) {
+                    final State copy = state.copy();
+                    final Bot myBot = copy.myBot;
+                    final String[] actionParts = action.split(" ");
+                    final Tree actingTree = actionParts.length > 1 ? copy.treeMap.get(Integer.parseInt(actionParts[1])) : null;
+                    copy.applyAction(actionParts, actingTree, copy.myBot);
+
+                    int treeScore = 0;
+                    for (Tree tree : myBot.trees)
+                        treeScore += tree.size + 1;
+
+                    int score = 200 * copy.day / 23 * 3 * myBot.score
+                            + 200 * (24 - copy.day) / 23 * 2 * myBot.sun
+                            + 100 * treeScore;
+
+                    score += 100 * (myBot.maxSun() - copy.oppBot.maxSun());
+
+                    System.err.println(String.format("Action '%s' -> score = %s", action, score));
+                    if (bestAction == null || score > bestScore) {
+                        bestAction = action;
+                        bestScore = score;
+                    }
+                }
+
+                return bestAction;
             }
 
             String act() {
@@ -584,10 +618,11 @@ class Player {
                         myBot.sun -= myActingTree.seedCost();
                         oppBot.sun -= oppActingTree.seedCost();
                     } else {
+                        final int initialNutrients = state.nutrients;
                         state.applyAction(myActionParts, myActingTree, myBot);
                         state.applyAction(oppActionParts, oppActingTree, oppBot);
 
-                        if (myAction.startsWith("COMPLETE") && oppAction.startsWith("COMPLETE"))
+                        if (myAction.startsWith("COMPLETE") && oppAction.startsWith("COMPLETE") && initialNutrients > 0)
                             oppBot.score++;
                     }
 
