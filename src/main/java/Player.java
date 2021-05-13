@@ -291,9 +291,16 @@ class Player {
                 oppBot.growToComplete();
                 myBot.growToComplete();
 
-                if (myBot.isWaiting && oppBot.isWaiting)
-                    state.nextDay();
+                if (myBot.isWaiting && oppBot.isWaiting) {
+                    if (state.day == LAST_DAY)
+                        break;
+                    else
+                        state.nextDay();
+                }
             }
+
+            myInfo.maxScore = myBot.score;
+            oppInfo.maxScore = oppBot.score;
         }
 
         void addTree(int cellIndex, int size, boolean isMine, boolean isDormant) {
@@ -436,6 +443,8 @@ class Player {
                 final ScoreInfo oppScoreInfo = new ScoreInfo();
 
                 for (String action : actions) {
+
+                    System.err.println("Action " + action + " -->");
                     final State copy = state.copy();
                     final Bot myBot = copy.myBot;
                     final Bot oppBot = copy.oppBot;
@@ -445,8 +454,6 @@ class Player {
 
                     myBot.score(myScoreInfo);
                     oppBot.score(oppScoreInfo);
-
-                    System.err.println("Action " + action + " -->");
                     System.err.println(String.format("Score %s vs %s", myScoreInfo.scoreScore, oppScoreInfo.scoreScore));
                     System.err.println(String.format("Sun %s vs %s", myScoreInfo.sunScore, oppScoreInfo.sunScore));
                     System.err.println(String.format("Tree %s vs %s", myScoreInfo.treeScore, oppScoreInfo.treeScore));
@@ -455,9 +462,12 @@ class Player {
                     copy.maxScore(myScoreInfo, oppScoreInfo);
                     System.err.println(String.format("Max score %s vs %s", myScoreInfo.maxScore, oppScoreInfo.maxScore));
 
-                    if (bestAction == null || myScoreInfo.maxScore - oppScoreInfo.maxScore > bestScore) {
+                    final int score = (myScoreInfo.maxScore - oppScoreInfo.maxScore
+                            + myScoreInfo.maxSun - oppScoreInfo.maxSun) * 100
+                            + (myScoreInfo.treeScore - oppScoreInfo.treeScore);
+                    if (bestAction == null || score > bestScore) {
                         bestAction = action;
-                        bestScore = myScoreInfo.maxScore - oppScoreInfo.maxScore;
+                        bestScore = score;
                     }
                 }
 
@@ -538,6 +548,9 @@ class Player {
                 if (State.this.day < LAST_DAY) {
                     Tree toGrow = null;
                     for (Tree tree : trees) {
+                        if (tree.isDormant)
+                            continue;;
+
                         if (tree.size == LARGE_TREE && (toComplete == null || toComplete.cell.richness < tree.cell.richness))
                             toComplete = tree;
                         if (tree.size < LARGE_TREE && (toGrow == null || toGrow.size < tree.size || toGrow.cell.richness < tree.cell.richness))
@@ -555,20 +568,24 @@ class Player {
                             if (scoreInfo.maxSun >= treeCounts[LARGE_TREE] * COMPLETE_BASE_COST)
                                 toGrow.grow();
                             else
-                                (isMine ? myBot : oppBot).isWaiting = true;
+                                isWaiting = true;
                         } else {
                             toGrow.grow();
                         }
                     } else {
-                        (isMine ? myBot : oppBot).isWaiting = true;
+                        isWaiting = true;
                     }
                 } else if (sun >= COMPLETE_BASE_COST) {
                     for (Tree tree : trees) {
-                        if (tree.size == LARGE_TREE && (toComplete == null || toComplete.cell.richness < tree.cell.richness))
+                        if (!tree.isDormant && tree.size == LARGE_TREE && (toComplete == null || toComplete.cell.richness < tree.cell.richness))
                             toComplete = tree;
                     }
                     if (toComplete != null)
                         toComplete.complete();
+                    else
+                        isWaiting = true;
+                } else {
+                    isWaiting = true;
                 }
             }
 
@@ -600,9 +617,12 @@ class Player {
                 for (Tree tree : trees)
                     treeScore += tree.size + 1;
 
-                int scoreScore = State.this.day / 23 * 3 * score;
-                int sunScore = (24 - State.this.day) / 23 * 2 * sun;
+                int scoreScore = State.this.day * 3 * score / 23;
+                int sunScore = (24 - State.this.day) * 2 * sun / 23;
 
+                scoreInfo.scoreScore = scoreScore;
+                scoreInfo.sunScore = sunScore;
+                scoreInfo.treeScore = treeScore;
             }
 
             int getFinalScore() {
@@ -633,7 +653,7 @@ class Player {
             }
         }
 
-        class ScoreInfo {
+        static class ScoreInfo {
             int scoreScore, sunScore, treeScore, maxSun, maxScore;
         }
 
