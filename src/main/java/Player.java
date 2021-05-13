@@ -277,7 +277,7 @@ class Player {
 
         void maxSun(ScoreInfo myInfo, ScoreInfo oppInfo) {
             final State state = copy();
-            while (state.day <= LAST_DAY)
+            while (state.day < LAST_DAY)
                 state.nextDay();
             myInfo.maxSun = state.myBot.sun;
             oppInfo.maxSun = state.oppBot.sun;
