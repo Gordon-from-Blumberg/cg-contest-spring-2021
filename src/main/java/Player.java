@@ -275,8 +275,10 @@ class Player {
             });
         }
 
-        void maxSun(ScoreInfo myInfo, ScoreInfo oppInfo) {
+        void maxSun(ScoreInfo myInfo, ScoreInfo oppInfo, Integer toGrow) {
             final State state = copy();
+            if (toGrow != null)
+                state.treeMap.get(toGrow).grow();
             while (state.day < LAST_DAY)
                 state.nextDay();
             myInfo.maxSun = state.myBot.sun;
@@ -299,8 +301,8 @@ class Player {
                 }
             }
 
-            myInfo.maxScore = myBot.score;
-            oppInfo.maxScore = oppBot.score;
+            myInfo.maxScore = myBot.score + myBot.sun / 3;
+            oppInfo.maxScore = oppBot.score + oppBot.sun / 3;
         }
 
         void addTree(int cellIndex, int size, boolean isMine, boolean isDormant) {
@@ -457,13 +459,13 @@ class Player {
                     System.err.println(String.format("Score %s vs %s", myScoreInfo.scoreScore, oppScoreInfo.scoreScore));
                     System.err.println(String.format("Sun %s vs %s", myScoreInfo.sunScore, oppScoreInfo.sunScore));
                     System.err.println(String.format("Tree %s vs %s", myScoreInfo.treeScore, oppScoreInfo.treeScore));
-                    copy.maxSun(myScoreInfo, oppScoreInfo);
+                    copy.maxSun(myScoreInfo, oppScoreInfo, actionParts.length > 2 ? Integer.parseInt(actionParts[2]) : null);
                     System.err.println(String.format("Max sun %s vs %s", myScoreInfo.maxSun, oppScoreInfo.maxSun));
                     copy.maxScore(myScoreInfo, oppScoreInfo);
                     System.err.println(String.format("Max score %s vs %s", myScoreInfo.maxScore, oppScoreInfo.maxScore));
 
-                    final int score = (myScoreInfo.maxScore - oppScoreInfo.maxScore
-                            + myScoreInfo.maxSun - oppScoreInfo.maxSun) * 100
+                    final int score = (myScoreInfo.maxScore - oppScoreInfo.maxScore) * 100
+                            + (myScoreInfo.maxSun - oppScoreInfo.maxSun) * 50
                             + (myScoreInfo.treeScore - oppScoreInfo.treeScore);
                     if (bestAction == null || score > bestScore) {
                         bestAction = action;
@@ -563,7 +565,7 @@ class Player {
                             copy.treeMap.get(toGrow.cell.index).grow();
                             final int[] treeCounts = (isMine ? copy.myBot : copy.oppBot).getTreeCounts();
                             final ScoreInfo myInfo = new ScoreInfo(), oppInfo = new ScoreInfo();
-                            copy.maxSun(myInfo, oppInfo);
+                            copy.maxSun(myInfo, oppInfo, null);
                             final ScoreInfo scoreInfo = isMine ? myInfo : oppInfo;
                             if (scoreInfo.maxSun >= treeCounts[LARGE_TREE] * COMPLETE_BASE_COST)
                                 toGrow.grow();
